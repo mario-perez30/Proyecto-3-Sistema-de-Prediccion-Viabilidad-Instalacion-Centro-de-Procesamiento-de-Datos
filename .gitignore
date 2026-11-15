@@ -18,6 +18,7 @@ ENV/
 .DS_Store
 Thumbs.db
 
-# Large raw caches if needed (keeping data/processed tracked)
-data/raw/ree_demand/
-data/raw/ree_balance/
+# Datos originales: no se suben (hay ficheros de mas de 100 MB).
+# Solo se versiona el registro de descargas; el catalogo esta en data/FUENTES.md.
+data/raw/*
+!data/raw/_descargas.csv
