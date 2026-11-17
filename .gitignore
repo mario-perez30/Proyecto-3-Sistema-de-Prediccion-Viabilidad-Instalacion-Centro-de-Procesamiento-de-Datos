@@ -19,5 +19,5 @@ ENV/
 Thumbs.db
 
 # Large raw caches if needed (keeping data/processed tracked)
-data/raw/ree_demand/
-data/raw/ree_balance/
+data/raw/
+*.pdf
