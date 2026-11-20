@@ -1,0 +1,11 @@
+# Normaliza finales de línea a LF en el repositorio (evita diffs fantasma entre Windows y Linux).
+* text=auto eol=lf
+
+*.pdf binary
+*.png binary
+*.jpg binary
+*.parquet binary
+*.duckdb binary
+*.joblib binary
+*.docx binary
+*.xlsx binary

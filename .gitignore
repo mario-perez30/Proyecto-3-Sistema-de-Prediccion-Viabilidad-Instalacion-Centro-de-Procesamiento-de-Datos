@@ -6,6 +6,14 @@ __pycache__/
 # Caches
 .pytest_cache/
 .ipynb_checkpoints/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+*.egg-info/
+build/
+dist/
 
 # Environments
 .env
@@ -22,3 +30,16 @@ Thumbs.db
 # Solo se versiona el registro de descargas; el catalogo esta en data/FUENTES.md.
 data/raw/*
 !data/raw/_descargas.csv
+
+# Zonas generadas por el pipeline (se regeneran con `python -m cpd ...`).
+data/processed/
+data/warehouse/
+models/**/*.joblib
+
+# Material de clase (PDF con derechos del centro); el enunciado sí se versiona.
+*.pdf
+!P3 Enunciado.pdf
+
+# Documento de entrega generado (se construye desde docs/ con scripts/generar_docx.py)
+docs/entrega/*.docx
+~$*.docx
