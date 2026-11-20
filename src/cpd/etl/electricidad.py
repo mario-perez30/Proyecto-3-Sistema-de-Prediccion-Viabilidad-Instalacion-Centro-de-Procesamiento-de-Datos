@@ -144,6 +144,15 @@ def demanda_ccaa_mensual(
             )
         )
     tabla = pd.concat(partes, ignore_index=True)
+    # Limpieza: una demanda negativa es un error de la fuente (p. ej. Cantabria, jul-ago 2026).
+    negativos = tabla["demanda_mwh"] < 0
+    if negativos.any():
+        log.warning(
+            "Se anulan %s valores de demanda negativos: %s",
+            negativos.sum(),
+            tabla.loc[negativos, ["fecha", "codigo_ccaa"]].to_dict("records"),
+        )
+        tabla.loc[negativos, "demanda_mwh"] = float("nan")
     return (
         tabla.drop_duplicates(["fecha", "codigo_ccaa"], keep="last")
         .sort_values(["codigo_ccaa", "fecha"])

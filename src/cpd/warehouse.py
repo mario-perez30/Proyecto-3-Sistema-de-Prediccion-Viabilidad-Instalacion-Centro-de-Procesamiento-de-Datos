@@ -177,6 +177,7 @@ def construir(
         con.register("fact_precio_df", fact_precio)
         con.execute("INSERT INTO fact_precio_horario SELECT * FROM fact_precio_df")
         if ccaa is not None:
+            ccaa = ccaa.dropna(subset=["demanda_mwh"])
             fact_mensual = pd.DataFrame(
                 {
                     "fecha_id": _fecha_id(ccaa["fecha"]),

@@ -114,3 +114,19 @@ def test_se_recorta_el_dia_en_curso():
     assert demanda["fecha"].max() == pd.Timestamp("2026-11-19")
     precios = electricidad.precio_horario(cliente, date(2026, 11, 18), date(2026, 11, 19))
     assert precios["fecha_hora"].max() == pd.Timestamp("2026-11-19 23:00")
+
+
+def test_demanda_ccaa_anula_valores_negativos(cliente_falso, monkeypatch):
+    serie_original = cliente_falso.serie
+
+    def serie_con_negativo(*args, **kwargs):
+        tabla = serie_original(*args, **kwargs)
+        tabla.loc[tabla.index[-1], "valor"] = -7000.0
+        return tabla
+
+    monkeypatch.setattr(cliente_falso, "serie", serie_con_negativo)
+    tabla = electricidad.demanda_ccaa_mensual(
+        cliente_falso, date(2023, 1, 1), date(2023, 3, 31), electricidad.COMUNIDADES[:1]
+    )
+    assert tabla["demanda_mwh"].isna().sum() == 1
+    assert (tabla["demanda_mwh"].dropna() > 0).all()
