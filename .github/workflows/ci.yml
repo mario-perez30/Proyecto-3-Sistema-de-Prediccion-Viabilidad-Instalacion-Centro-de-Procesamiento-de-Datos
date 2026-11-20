@@ -1,11 +1,11 @@
 name: CI
 
-# Se ejecuta en cada push a las ramas principales y en cada Pull Request hacia ellas.
+# Se ejecuta en cada push a las ramas principales y en todos los Pull Request
+# (también en los apilados, cuya base es otra rama de trabajo).
 on:
   push:
     branches: [main, desarrollo]
   pull_request:
-    branches: [main, desarrollo]
   workflow_dispatch:
 
 concurrency:
