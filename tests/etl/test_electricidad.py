@@ -26,6 +26,24 @@ def test_demanda_ccaa_tiene_una_fila_por_mes_y_comunidad(cliente_falso):
     assert (tabla["fecha"].dt.day == 1).all()
 
 
+def test_demanda_ccaa_omite_comunidad_sin_datos(cliente_falso, monkeypatch):
+    from cpd.etl.ree_client import REEError
+
+    serie_original = cliente_falso.serie
+
+    def serie_con_fallo(recurso, *args, parametros=None, **kwargs):
+        if parametros and parametros["geo_ids"] == 8745:
+            raise REEError("sin datos")
+        return serie_original(recurso, *args, parametros=parametros, **kwargs)
+
+    monkeypatch.setattr(cliente_falso, "serie", serie_con_fallo)
+    comunidades = (electricidad.COMUNIDADES[0], electricidad.COMUNIDADES[-1])  # Andalucía, Melilla
+    tabla = electricidad.demanda_ccaa_mensual(
+        cliente_falso, date(2023, 1, 1), date(2023, 2, 28), comunidades
+    )
+    assert set(tabla["codigo_ccaa"]) == {"AN"}
+
+
 def test_normalizar_precios_agrega_cuartos_de_hora():
     instantes = pd.date_range("2025-10-01 00:00", periods=4, freq="15min", tz="UTC")
     bruto = pd.DataFrame(

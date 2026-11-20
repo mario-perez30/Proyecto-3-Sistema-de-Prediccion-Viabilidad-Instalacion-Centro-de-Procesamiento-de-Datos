@@ -23,7 +23,7 @@ from datetime import date, timedelta
 import pandas as pd
 
 from cpd import config
-from cpd.etl.ree_client import REEClient, hoy
+from cpd.etl.ree_client import REEClient, REEError, hoy
 
 log = logging.getLogger(__name__)
 
@@ -102,24 +102,31 @@ def demanda_ccaa_mensual(
 ) -> pd.DataFrame:
     """Demanda mensual por comunidad autónoma.
 
+    Si la API no tiene datos de una comunidad (le pasa a Melilla), se avisa en el log y se
+    sigue con las demás en lugar de abortar todo el proceso.
+
     Returns:
         DataFrame ``fecha | ccaa | codigo_ccaa | demanda_mwh`` (``fecha`` = día 1 del mes).
     """
     partes = []
     for ccaa in comunidades:
-        bruto = cliente.serie(
-            "demanda/evolucion",
-            desde,
-            hasta or _ayer(),
-            "month",
-            trocear_por="year",
-            parametros={
-                "geo_trunc": "electric_system",
-                "geo_limit": "ccaa",
-                "geo_ids": ccaa.geo_id,
-            },
-            prefijo_clave=f"ccaa{ccaa.geo_id}_",
-        )
+        try:
+            bruto = cliente.serie(
+                "demanda/evolucion",
+                desde,
+                hasta or _ayer(),
+                "month",
+                trocear_por="year",
+                parametros={
+                    "geo_trunc": "electric_system",
+                    "geo_limit": "ccaa",
+                    "geo_ids": ccaa.geo_id,
+                },
+                prefijo_clave=f"ccaa{ccaa.geo_id}_",
+            )
+        except REEError as error:
+            log.warning("Sin datos de demanda para %s: se omite (%s)", ccaa.nombre, error)
+            continue
         bruto = bruto[bruto["serie"] == "Demanda"]
         partes.append(
             pd.DataFrame(
