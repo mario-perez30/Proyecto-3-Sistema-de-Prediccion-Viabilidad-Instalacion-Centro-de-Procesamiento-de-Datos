@@ -4,6 +4,7 @@ Uso::
 
     python -m cpd descargar            # ETL: REE → data/raw → data/processed
     python -m cpd warehouse            # Carga del Data Warehouse (DuckDB)
+    python -m cpd entrenar consumo     # Backtesting y entrenamiento de los modelos de demanda
 """
 
 from __future__ import annotations
@@ -34,6 +35,28 @@ def _warehouse(_: argparse.Namespace) -> int:
     return 0
 
 
+def _imprimir_metricas(nombre: str, metricas: dict[str, dict]) -> None:
+    print(f"\n{nombre}")
+    print(f"  {'modelo':<20}{'MAE':>14}{'RMSE':>14}{'MAPE %':>9}{'MASE':>7}")
+    for modelo, m in metricas.items():
+        mape = f"{m['mape']:.2f}" if "mape" in m else "-"
+        print(
+            f"  {modelo:<20}{m['mae']:>14,.1f}{m['rmse']:>14,.1f}{mape:>9}{m.get('mase', 0):>7.2f}"
+        )
+
+
+def _entrenar(args: argparse.Namespace) -> int:
+    if args.objetivo == "consumo":
+        from cpd.models import consumo as modulo
+    else:
+        from cpd.models import precio as modulo
+    informe = modulo.entrenar()
+    print(f"Datos: {informe['datos']}")
+    _imprimir_metricas("Corto plazo (backtesting diario)", informe["corto_plazo"]["metricas"])
+    _imprimir_metricas("Largo plazo (backtesting mensual)", informe["largo_plazo"]["metricas"])
+    return 0
+
+
 def crear_parser() -> argparse.ArgumentParser:
     """Define los subcomandos disponibles."""
     parser = argparse.ArgumentParser(prog="cpd", description="Plataforma de viabilidad de CPD")
@@ -50,6 +73,10 @@ def crear_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("warehouse", help="carga las tablas limpias en el Data Warehouse (DuckDB)")
     p.set_defaults(func=_warehouse)
+
+    p = sub.add_parser("entrenar", help="valida y entrena los modelos predictivos")
+    p.add_argument("objetivo", choices=["consumo", "precio"], help="qué modelo entrenar")
+    p.set_defaults(func=_entrenar)
     return parser
 
 

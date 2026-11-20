@@ -2,8 +2,21 @@
 
 from __future__ import annotations
 
+import numpy as np
 import pandas as pd
 import pytest
+
+
+@pytest.fixture
+def serie_demanda() -> pd.Series:
+    """Demanda diaria sintética (4 años) con estacionalidad semanal y anual y ruido."""
+    fechas = pd.date_range("2020-01-01", "2023-12-31", freq="D")
+    t = np.arange(len(fechas))
+    rng = np.random.default_rng(0)
+    semanal = np.where(fechas.day_of_week >= 5, -90_000, 0)
+    anual = 60_000 * np.cos(2 * np.pi * t / 365.25)
+    valores = 700_000 + semanal + anual + rng.normal(0, 8_000, len(t))
+    return pd.Series(valores, index=fechas, name="demanda_mwh")
 
 
 def respuesta_ree(series: dict[str, list[tuple[str, float]]]) -> dict:
