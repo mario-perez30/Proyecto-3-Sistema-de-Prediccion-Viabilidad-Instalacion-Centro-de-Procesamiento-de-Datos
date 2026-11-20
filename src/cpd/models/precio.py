@@ -8,10 +8,13 @@ Igual que para el consumo hay dos horizontes:
 
 1. **Corto plazo (días)**: gradient boosting recursivo. Sin logaritmo, porque desde 2024 hay
    días con precio 0 o negativo (exceso de solar y eólica).
-2. **Largo plazo (meses, hasta 10 años)**: Holt-Winters amortiguado sobre el logaritmo del
-   precio medio mensual. El intervalo resultante es muy ancho: el precio depende del gas, del
-   CO₂ y de la regulación, que no están en los datos. El intervalo se usa como **escenario
-   pesimista / central / optimista** del coste operativo, no como una cifra exacta.
+2. **Largo plazo (meses, hasta 10 años)**: modelo autorregresivo con **reversión a la media**
+   (AR(1) sobre el logaritmo del precio medio mensual). Tras un periodo extremo la previsión
+   vuelve gradualmente a la media histórica. Un Holt-Winters con tendencia daba intervalos
+   absurdos a 10 años (de 3 a más de 7.000 €/MWh) porque acumula la incertidumbre de la
+   tendencia. El precio depende del gas, del CO₂ y de la regulación, que no están en los datos,
+   así que el intervalo se usa como **escenario optimista / central / pesimista** del coste
+   operativo, no como una cifra exacta.
 
 El precio horario de cada día se reconstruye con el **perfil horario** reciente (cuánto se
 separa cada hora de la media del día, por mes y tipo de día).
@@ -92,7 +95,7 @@ def configuracion(**cambios) -> series.ConfiguracionEntrenamiento:
         "diario": series.ModeloRecursivo(
             lags=(1, 2, 7, 14, 28, 364), ventanas=(7, 28, 90), log=False
         ),
-        "mensual": series.ModeloMensual(log=True),
+        "mensual": series.ModeloReversion(),
         "agregacion_mensual": "mean",
     }
     valores.update(cambios)
@@ -112,7 +115,7 @@ def entrenar(serie: pd.Series | None = None, carpeta: Path | None = None, **camb
     return series.entrenar_y_guardar(serie, configuracion(**cambios), carpeta)
 
 
-def cargar(carpeta: Path | None = None) -> tuple[series.ModeloRecursivo, series.ModeloMensual]:
+def cargar(carpeta: Path | None = None) -> tuple[series.ModeloRecursivo, series.ModeloReversion]:
     """Carga los modelos de precio entrenados."""
     return series.cargar(carpeta or config.MODELS_DIR / CARPETA)
 

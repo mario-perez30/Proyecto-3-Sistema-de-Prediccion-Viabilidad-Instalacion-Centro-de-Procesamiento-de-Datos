@@ -67,3 +67,17 @@ def test_bandas_de_error_relativas_y_absolutas():
     absolutas = series.bandas_de_error(resultados, relativo=False)
     assert absolutas.attrs["relativo"] is False
     assert absolutas.loc[2, "q95"] >= 4
+
+
+def test_modelo_reversion_vuelve_a_la_media_con_intervalo_acotado():
+    rng = np.random.default_rng(7)
+    log_precio = [np.log(60)]
+    for _ in range(150):  # AR(1) alrededor de 60 €/MWh
+        log_precio.append(np.log(60) + 0.7 * (log_precio[-1] - np.log(60)) + rng.normal(0, 0.15))
+    serie = pd.Series(np.exp(log_precio), index=pd.date_range("2012-01-01", periods=151, freq="MS"))
+    serie.iloc[-6:] = 200.0  # crisis reciente
+    prevision = series.ModeloReversion().ajustar(serie).predecir_futuro(120)
+    assert prevision["prediccion"].iloc[0] > prevision["prediccion"].iloc[-1]
+    assert prevision["prediccion"].iloc[-1] < 120
+    assert prevision["superior"].iloc[-1] < 10 * prevision["prediccion"].iloc[-1]
+    assert (prevision["inferior"] < prevision["prediccion"]).all()

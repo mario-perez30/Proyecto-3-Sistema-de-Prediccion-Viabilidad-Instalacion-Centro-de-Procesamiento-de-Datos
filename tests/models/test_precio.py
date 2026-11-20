@@ -48,6 +48,7 @@ def test_a_horario_conserva_la_media_diaria(horario):
 def test_configuracion_de_precio_no_usa_log_en_diario():
     conf = precio.configuracion()
     assert not conf.diario.log
+    assert isinstance(conf.mensual, series.ModeloReversion)
     assert conf.agregacion_mensual == "mean"
 
 
