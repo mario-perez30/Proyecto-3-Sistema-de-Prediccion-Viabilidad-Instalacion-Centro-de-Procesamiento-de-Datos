@@ -91,3 +91,26 @@ def test_ejecutar_guarda_tablas_e_informe(cliente_falso, tmp_path, monkeypatch):
     assert (tmp_path / "demanda_diaria.parquet").exists()
     assert (tmp_path / "precio_horario.parquet").exists()
     assert (tmp_path / "validacion_electricidad.json").exists()
+
+
+class _ClienteQueSePasa:
+    """Devuelve un día más del pedido, como hace la API real con el día en curso."""
+
+    def serie(
+        self, recurso, inicio, fin, time_trunc, trocear_por, parametros=None, prefijo_clave=""
+    ):
+        if recurso.startswith("mercados"):
+            horas = pd.date_range(f"{inicio}", f"{fin} 23:00", freq="h", tz="Europe/Madrid")
+            horas = horas.append(horas[-24:] + pd.Timedelta(days=1))
+            return pd.DataFrame({"serie": "PVPC", "fecha": horas.tz_convert("UTC"), "valor": 1.0})
+        dias = pd.date_range(f"{inicio}", f"{fin}", freq="D", tz="Europe/Madrid")
+        dias = dias.append(pd.DatetimeIndex([dias[-1] + pd.Timedelta(days=1)]))
+        return pd.DataFrame({"serie": "Demanda", "fecha": dias.tz_convert("UTC"), "valor": 1.0})
+
+
+def test_se_recorta_el_dia_en_curso():
+    cliente = _ClienteQueSePasa()
+    demanda = electricidad.demanda_diaria(cliente, date(2026, 11, 1), date(2026, 11, 19))
+    assert demanda["fecha"].max() == pd.Timestamp("2026-11-19")
+    precios = electricidad.precio_horario(cliente, date(2026, 11, 18), date(2026, 11, 19))
+    assert precios["fecha_hora"].max() == pd.Timestamp("2026-11-19 23:00")

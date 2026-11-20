@@ -85,12 +85,17 @@ def demanda_diaria(
 ) -> pd.DataFrame:
     """Demanda eléctrica nacional por día.
 
+    La API añade a veces el día en curso aunque se pida hasta ayer (dato provisional e
+    incompleto), así que se recorta a ``hasta``.
+
     Returns:
         DataFrame ``fecha | demanda_mwh`` ordenado por fecha y sin duplicados.
     """
-    bruto = cliente.serie("demanda/evolucion", desde, hasta or _ayer(), "day", trocear_por="year")
+    hasta = hasta or _ayer()
+    bruto = cliente.serie("demanda/evolucion", desde, hasta, "day", trocear_por="year")
     bruto = bruto[bruto["serie"] == "Demanda"]
     tabla = pd.DataFrame({"fecha": _a_fecha_local(bruto["fecha"]), "demanda_mwh": bruto["valor"]})
+    tabla = tabla[tabla["fecha"] <= pd.Timestamp(hasta)]
     return tabla.drop_duplicates("fecha", keep="last").sort_values("fecha").reset_index(drop=True)
 
 
@@ -178,15 +183,18 @@ def normalizar_precios(bruto: pd.DataFrame) -> pd.DataFrame:
 def precio_horario(
     cliente: REEClient, desde: date = INICIO_PRECIOS, hasta: date | None = None
 ) -> pd.DataFrame:
-    """Precio horario del mercado diario (spot) y del PVPC."""
+    """Precio horario del mercado diario (spot) y del PVPC hasta ``hasta`` incluido."""
+    hasta = hasta or _ayer()
     bruto = cliente.serie(
         "mercados/precios-mercados-tiempo-real",
         desde,
-        hasta or _ayer(),
+        hasta,
         "hour",
         trocear_por="month",
     )
-    return normalizar_precios(bruto)
+    tabla = normalizar_precios(bruto)
+    fin = pd.Timestamp(hasta) + pd.Timedelta(days=1)
+    return tabla[tabla["fecha_hora"] < fin].reset_index(drop=True)
 
 
 # ---------------------------------------------------------------------------
