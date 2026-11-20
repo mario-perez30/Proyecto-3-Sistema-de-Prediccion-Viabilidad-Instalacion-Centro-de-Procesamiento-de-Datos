@@ -32,6 +32,12 @@ def test_backtesting_no_mira_el_futuro():
     assert resultados["fecha"].max() == serie.index.max()
 
 
+def test_backtesting_avisa_si_la_serie_es_corta():
+    serie = pd.Series(range(10), index=pd.date_range("2024-01-01", periods=10), dtype=float)
+    with pytest.raises(ValueError, match="demasiado corta"):
+        evaluacion.backtesting(serie, evaluacion.ingenuo_estacional(7), n_pliegues=2, horizonte=10)
+
+
 def test_ingenuo_semanal_repite_la_semana_anterior():
     serie = pd.Series(range(14), index=pd.date_range("2024-01-01", periods=14), dtype=float)
     pred = evaluacion.ingenuo_estacional(7)(serie, pd.date_range("2024-01-15", periods=8))

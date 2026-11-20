@@ -20,6 +20,7 @@ import numpy as np
 import pandas as pd
 from sklearn.ensemble import HistGradientBoostingRegressor
 from statsmodels.tsa.holtwinters import ExponentialSmoothing
+from statsmodels.tsa.statespace.sarimax import SARIMAX
 
 from cpd.features.temporal import matriz_diaria
 from cpd.models import evaluacion
@@ -162,6 +163,7 @@ class ModeloMensual:
 
     log: bool = True
     simulaciones: int = 1000
+    nombre: str = "holt_winters"
 
     def ajustar(self, serie_mensual: pd.Series) -> ModeloMensual:
         # Con menos de dos años no se puede estimar la estacionalidad: solo nivel y tendencia.
@@ -212,7 +214,56 @@ class ModeloMensual:
 
     def predictor(self) -> evaluacion.Predictor:
         def predecir(historia: pd.Series, fechas: pd.DatetimeIndex) -> pd.Series:
-            return ModeloMensual(self.log, self.simulaciones).ajustar(historia).predecir(fechas)
+            return (
+                ModeloMensual(self.log, self.simulaciones, self.nombre)
+                .ajustar(historia)
+                .predecir(fechas)
+            )
+
+        return predecir
+
+
+@dataclass
+class ModeloReversion:
+    """Modelo autorregresivo AR(1) con constante sobre el logaritmo (reversión a la media).
+
+    Adecuado para precios a largo plazo: tras un periodo extremo (crisis del gas) la previsión
+    vuelve gradualmente hacia la media histórica y el intervalo de confianza queda acotado, en
+    lugar de crecer sin límite como en los modelos con tendencia.
+    """
+
+    nombre: str = "reversion_ar1"
+
+    def ajustar(self, serie_mensual: pd.Series) -> ModeloReversion:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            self.modelo_ = SARIMAX(
+                np.log(serie_mensual.asfreq("MS")), order=(1, 0, 0), trend="c"
+            ).fit(disp=False)
+        self.historia_ = serie_mensual
+        return self
+
+    def predecir(self, fechas: pd.DatetimeIndex) -> pd.Series:
+        return pd.Series(np.exp(self.modelo_.forecast(len(fechas)).to_numpy()), index=fechas)
+
+    def predecir_futuro(self, meses: int = 120) -> pd.DataFrame:
+        """Previsión mensual con intervalo del 90 %."""
+        inicio = self.historia_.index.max() + pd.offsets.MonthBegin(1)
+        fechas = pd.date_range(inicio, periods=meses, freq="MS")
+        prevision = self.modelo_.get_forecast(meses)
+        intervalo = np.exp(prevision.conf_int(alpha=0.10).to_numpy())
+        return pd.DataFrame(
+            {
+                "mes": fechas,
+                "prediccion": np.exp(prevision.predicted_mean.to_numpy()),
+                "inferior": intervalo[:, 0],
+                "superior": intervalo[:, 1],
+            }
+        )
+
+    def predictor(self) -> evaluacion.Predictor:
+        def predecir(historia: pd.Series, fechas: pd.DatetimeIndex) -> pd.Series:
+            return ModeloReversion().ajustar(historia).predecir(fechas)
 
         return predecir
 
@@ -224,7 +275,7 @@ class ConfiguracionEntrenamiento:
     nombre: str
     unidad: str
     diario: ModeloRecursivo
-    mensual: ModeloMensual
+    mensual: ModeloMensual | ModeloReversion
     agregacion_mensual: str = "sum"
     pliegues_diarios: int = 12
     horizonte_diario: int = 30
@@ -285,7 +336,7 @@ def entrenar_y_guardar(serie: pd.Series, conf: ConfiguracionEntrenamiento, carpe
     resultados_m, metricas_m = _backtesting_comparado(
         mensual,
         {
-            "holt_winters": conf.mensual.predictor(),
+            conf.mensual.nombre: conf.mensual.predictor(),
             "ingenuo_anual": evaluacion.ingenuo_estacional(12),
         },
         escala_m,
@@ -333,7 +384,7 @@ def entrenar_y_guardar(serie: pd.Series, conf: ConfiguracionEntrenamiento, carpe
     return informe
 
 
-def cargar(carpeta: Path) -> tuple[ModeloRecursivo, ModeloMensual]:
+def cargar(carpeta: Path) -> tuple[ModeloRecursivo, ModeloMensual | ModeloReversion]:
     """Carga los modelos diario y mensual guardados en ``carpeta``."""
     return joblib.load(carpeta / "modelo_diario.joblib"), joblib.load(
         carpeta / "modelo_mensual.joblib"
