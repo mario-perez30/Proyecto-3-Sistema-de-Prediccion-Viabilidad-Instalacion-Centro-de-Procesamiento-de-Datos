@@ -1,0 +1,35 @@
+name: Tarea
+description: Trabajo planificado (funcionalidad, datos, documentación)
+title: "[Tarea] "
+labels: ["tarea"]
+body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: Área
+      options:
+        - Datos / ETL
+        - Data Lake / Data Warehouse
+        - Modelos (ML / series temporales)
+        - Simulador
+        - Dashboard
+        - Documentación
+        - Infraestructura / CI
+    validations:
+      required: true
+  - type: textarea
+    id: descripcion
+    attributes:
+      label: Descripción
+      description: Qué hay que hacer y por qué.
+    validations:
+      required: true
+  - type: textarea
+    id: criterios
+    attributes:
+      label: Criterios de aceptación
+      description: Cuándo se considera terminada.
+      placeholder: |
+        - [ ] ...
+    validations:
+      required: true
