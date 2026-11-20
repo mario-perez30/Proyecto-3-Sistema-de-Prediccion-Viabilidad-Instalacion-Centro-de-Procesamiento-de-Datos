@@ -1,0 +1,402 @@
+{
+  "demanda": {
+    "dias": 5802,
+    "desde": "2011-01-01",
+    "hasta": "2026-11-19",
+    "media_diaria_gwh": 711.0,
+    "twh_por_anio": {
+      "2011": 270.0,
+      "2012": 266.9,
+      "2013": 260.6,
+      "2014": 257.7,
+      "2015": 262.8,
+      "2016": 264.7,
+      "2017": 267.9,
+      "2018": 268.9,
+      "2019": 264.7,
+      "2020": 250.1,
+      "2021": 256.5,
+      "2022": 250.5,
+      "2023": 246.7,
+      "2024": 249.0,
+      "2025": 256.3
+    },
+    "max_dia": [
+      "2011-01-25",
+      925.8
+    ],
+    "min_dia": [
+      "2025-04-28",
+      403.3
+    ],
+    "caida_fin_de_semana_pct": 13.2
+  },
+  "precio": {
+    "horas": 112944,
+    "desde": "2014-01-01 00:00:00",
+    "hasta": "2026-11-19 23:00:00",
+    "medio_por_anio": {
+      "2014": 42.1,
+      "2015": 50.3,
+      "2016": 39.7,
+      "2017": 52.2,
+      "2018": 57.3,
+      "2019": 47.7,
+      "2020": 34.0,
+      "2021": 111.9,
+      "2022": 167.5,
+      "2023": 87.1,
+      "2024": 63.0,
+      "2025": 65.3,
+      "2026": 88.2
+    },
+    "horas_precio_cero_o_negativo": 2820,
+    "max_diario": [
+      "2022-03-08",
+      545.0
+    ]
+  },
+  "correlacion_demanda_precio": {
+    "2014-2020": 0.42,
+    "2021-2023 (crisis)": 0.192,
+    "2024-hoy": 0.39
+  },
+  "ccaa": {
+    "anio": 2025,
+    "twh": {
+      "Ceuta": 0.21,
+      "La Rioja": 1.54,
+      "Cantabria": 3.75,
+      "Comunidad Foral de Navarra": 4.65,
+      "Extremadura": 5.03,
+      "Illes Balears": 6.32,
+      "Principado de Asturias": 8.23,
+      "Canarias": 8.98,
+      "Región de Murcia": 9.41,
+      "Aragón": 10.84,
+      "Castilla-La Mancha": 12.2,
+      "Castilla y León": 13.26,
+      "Galicia": 13.74,
+      "País Vasco": 14.45,
+      "Comunitat Valenciana": 27.81,
+      "Comunidad de Madrid": 28.95,
+      "Andalucía": 41.42,
+      "Cataluña": 45.25
+    }
+  },
+  "modelo_consumo": {
+    "objetivo": "consumo",
+    "unidad": "MWh",
+    "datos": {
+      "desde": "2011-01-01",
+      "hasta": "2026-11-19",
+      "dias": 5802
+    },
+    "corto_plazo": {
+      "horizonte_dias": 30,
+      "cortes": 12,
+      "metricas": {
+        "gradient_boosting": {
+          "mae": 25967.017449453866,
+          "rmse": 33708.65177509074,
+          "r2": 0.8146346897549265,
+          "n": 360,
+          "mape": 3.5465757885301743,
+          "mase": 0.8599324403945205
+        },
+        "ingenuo_semanal": {
+          "mae": 39925.789538888894,
+          "rmse": 52460.36981529882,
+          "r2": 0.5510392315726983,
+          "n": 360,
+          "mape": 5.539822642596093,
+          "mase": 1.3221958085747287
+        },
+        "ingenuo_anual": {
+          "mae": 35761.97205833333,
+          "rmse": 49544.08722599074,
+          "r2": 0.5995674614961889,
+          "n": 360,
+          "mape": 4.875936967978274,
+          "mase": 1.1843054353587315
+        }
+      }
+    },
+    "largo_plazo": {
+      "horizonte_meses": 24,
+      "cortes": 3,
+      "metricas": {
+        "holt_winters": {
+          "mae": 610593.9172476574,
+          "rmse": 808992.0083721697,
+          "r2": 0.6965586737383525,
+          "n": 72,
+          "mape": 2.779055538550042,
+          "mase": 0.8875075714695164
+        },
+        "ingenuo_anual": {
+          "mae": 722125.1325277777,
+          "rmse": 947217.121855674,
+          "r2": 0.5840076496913762,
+          "n": 72,
+          "mape": 3.318423815881031,
+          "mase": 1.0496198939480827
+        }
+      }
+    }
+  },
+  "prevision_consumo_anual": [
+    {
+      "mes": 2026,
+      "prediccion": 44285.64,
+      "inferior": 42221.37,
+      "superior": 46682.02
+    },
+    {
+      "mes": 2027,
+      "prediccion": 264561.25,
+      "inferior": 245451.89,
+      "superior": 285350.76
+    },
+    {
+      "mes": 2028,
+      "prediccion": 264561.24,
+      "inferior": 237806.94,
+      "superior": 294611.54
+    },
+    {
+      "mes": 2029,
+      "prediccion": 264561.23,
+      "inferior": 231904.57,
+      "superior": 300215.98
+    },
+    {
+      "mes": 2030,
+      "prediccion": 264561.23,
+      "inferior": 227952.75,
+      "superior": 305530.76
+    },
+    {
+      "mes": 2031,
+      "prediccion": 264561.23,
+      "inferior": 224192.92,
+      "superior": 310797.92
+    },
+    {
+      "mes": 2032,
+      "prediccion": 264561.23,
+      "inferior": 221354.48,
+      "superior": 318229.95
+    },
+    {
+      "mes": 2033,
+      "prediccion": 264561.23,
+      "inferior": 217061.88,
+      "superior": 322677.37
+    },
+    {
+      "mes": 2034,
+      "prediccion": 264561.23,
+      "inferior": 214582.77,
+      "superior": 327022.71
+    },
+    {
+      "mes": 2035,
+      "prediccion": 264561.23,
+      "inferior": 213151.0,
+      "superior": 329818.09
+    },
+    {
+      "mes": 2036,
+      "prediccion": 220275.6,
+      "inferior": 176911.58,
+      "superior": 276945.47
+    }
+  ],
+  "modelo_precio": {
+    "objetivo": "precio_spot",
+    "unidad": "€/MWh",
+    "datos": {
+      "desde": "2014-01-01",
+      "hasta": "2026-11-19",
+      "dias": 4706
+    },
+    "corto_plazo": {
+      "horizonte_dias": 30,
+      "cortes": 12,
+      "metricas": {
+        "gradient_boosting": {
+          "mae": 29.035944639515513,
+          "rmse": 37.472403339945444,
+          "r2": 0.5269996621875201,
+          "n": 360,
+          "mase": 1.8264943715288726
+        },
+        "ingenuo_semanal": {
+          "mae": 30.70364755485105,
+          "rmse": 42.306356434949045,
+          "r2": 0.3970940040571661,
+          "n": 360,
+          "mase": 1.9314005499246403
+        },
+        "ingenuo_anual": {
+          "mae": 52.2580054861111,
+          "rmse": 65.94552872762542,
+          "r2": -0.4649036602012908,
+          "n": 360,
+          "mase": 3.287268730971775
+        }
+      }
+    },
+    "largo_plazo": {
+      "horizonte_meses": 24,
+      "cortes": 3,
+      "metricas": {
+        "reversion_ar1": {
+          "mae": 31.644795925694886,
+          "rmse": 40.15867253232842,
+          "r2": -0.6799229767934423,
+          "n": 72,
+          "mape": 61.371379891630816,
+          "mase": 0.8482334044470351
+        },
+        "ingenuo_anual": {
+          "mae": 29.019151127426685,
+          "rmse": 35.54426932601123,
+          "r2": -0.31604231970155916,
+          "n": 72,
+          "mape": 64.35067968185835,
+          "mase": 0.77785343956013
+        }
+      }
+    }
+  },
+  "prevision_precio_anual": [
+    {
+      "mes": 2026,
+      "prediccion": 134.67,
+      "inferior": 76.79,
+      "superior": 237.59
+    },
+    {
+      "mes": 2027,
+      "prediccion": 82.24,
+      "inferior": 34.32,
+      "superior": 197.92
+    },
+    {
+      "mes": 2028,
+      "prediccion": 62.3,
+      "inferior": 24.24,
+      "superior": 160.1
+    },
+    {
+      "mes": 2029,
+      "prediccion": 59.86,
+      "inferior": 23.26,
+      "superior": 154.03
+    },
+    {
+      "mes": 2030,
+      "prediccion": 59.51,
+      "inferior": 23.13,
+      "superior": 153.13
+    },
+    {
+      "mes": 2031,
+      "prediccion": 59.46,
+      "inferior": 23.11,
+      "superior": 152.99
+    },
+    {
+      "mes": 2032,
+      "prediccion": 59.45,
+      "inferior": 23.1,
+      "superior": 152.97
+    },
+    {
+      "mes": 2033,
+      "prediccion": 59.45,
+      "inferior": 23.1,
+      "superior": 152.97
+    },
+    {
+      "mes": 2034,
+      "prediccion": 59.45,
+      "inferior": 23.1,
+      "superior": 152.97
+    },
+    {
+      "mes": 2035,
+      "prediccion": 59.45,
+      "inferior": 23.1,
+      "superior": 152.97
+    },
+    {
+      "mes": 2036,
+      "prediccion": 59.45,
+      "inferior": 23.1,
+      "superior": 152.97
+    }
+  ],
+  "ejemplo_cpd_50mw": {
+    "energia_anual_gwh": 427.0,
+    "peso_sobre_demanda_nacional_pct": 0.162,
+    "coste_anual_meur": [
+      {
+        "mes": 2027,
+        "coste_optimista_eur": 14.6,
+        "coste_eur": 35.1,
+        "coste_pesimista_eur": 84.4
+      },
+      {
+        "mes": 2028,
+        "coste_optimista_eur": 10.4,
+        "coste_eur": 26.7,
+        "coste_pesimista_eur": 68.6
+      },
+      {
+        "mes": 2029,
+        "coste_optimista_eur": 9.9,
+        "coste_eur": 25.6,
+        "coste_pesimista_eur": 65.8
+      },
+      {
+        "mes": 2030,
+        "coste_optimista_eur": 9.9,
+        "coste_eur": 25.4,
+        "coste_pesimista_eur": 65.4
+      },
+      {
+        "mes": 2031,
+        "coste_optimista_eur": 9.9,
+        "coste_eur": 25.4,
+        "coste_pesimista_eur": 65.3
+      },
+      {
+        "mes": 2032,
+        "coste_optimista_eur": 9.9,
+        "coste_eur": 25.5,
+        "coste_pesimista_eur": 65.5
+      },
+      {
+        "mes": 2033,
+        "coste_optimista_eur": 9.9,
+        "coste_eur": 25.4,
+        "coste_pesimista_eur": 65.3
+      },
+      {
+        "mes": 2034,
+        "coste_optimista_eur": 9.9,
+        "coste_eur": 25.4,
+        "coste_pesimista_eur": 65.3
+      },
+      {
+        "mes": 2035,
+        "coste_optimista_eur": 9.9,
+        "coste_eur": 25.4,
+        "coste_pesimista_eur": 65.3
+      }
+    ]
+  }
+}

@@ -29,7 +29,7 @@ Siguiendo la guía *Cómo abordar un proyecto en IA*:
 | 7 | Modelos de Machine Learning | Gradient boosting para el corto plazo |
 | 8 | Simulador de escenarios | Parámetros del CPD → consumo, coste y peso sobre la red |
 | 9 | Dashboards | [Informes 5 y 6](05_visualizacion.md) |
-| 10 | Series temporales | Holt-Winters a 10 años con intervalos |
+| 10 | Series temporales | Holt-Winters (consumo) y AR(1) con reversión a la media (precio) a 10 años, con intervalos |
 
 ## 1.4 Alcance y módulos
 
@@ -118,7 +118,7 @@ El proyecto se divide en módulos con responsable propio que se integran en un �
 ### Modelo de conocimiento e inferencia
 
 - **Conocimiento**: los datos históricos del Data Warehouse más conocimiento experto codificado como variables (festivos, puentes, eventos excepcionales como el confinamiento o la crisis del gas, fórmulas físicas del consumo de un CPD: potencia × PUE × horas).
-- **Aprendizaje**: supervisado. Gradient boosting de árboles de decisión para el corto plazo y modelos de suavizado exponencial para el largo plazo.
+- **Aprendizaje**: supervisado. Gradient boosting de árboles de decisión para el corto plazo; suavizado exponencial (consumo) y un modelo autorregresivo con reversión a la media (precio) para el largo plazo.
 - **Inferencia**: predicción recursiva (cada día predicho alimenta al siguiente) y simulación de trayectorias para los intervalos.
 - **Incertidumbre**: todas las previsiones llevan un intervalo del 90 %. En el corto plazo se calibra con los errores reales del backtesting; en el largo plazo se obtiene simulando 1.000 trayectorias del modelo.
 - **Evaluación**: validación temporal con origen móvil y comparación obligatoria con modelos ingenuos (un modelo solo se acepta si los mejora).
@@ -131,7 +131,7 @@ El proyecto se divide en módulos con responsable propio que se integran en un �
 | Datos | pandas, PyArrow (Parquet) | Tablas en memoria y almacenamiento columnar comprimido |
 | Data Warehouse | DuckDB | Base de datos analítica embebida, sin servidor, SQL estándar |
 | Machine Learning | scikit-learn | `HistGradientBoostingRegressor` |
-| Series temporales | statsmodels | Holt-Winters con intervalos por simulación |
+| Series temporales | statsmodels | Holt-Winters y SARIMAX con intervalos de confianza |
 | Calendario | holidays | Festivos nacionales de España |
 | Visualización | matplotlib, Plotly, Streamlit | Informes y dashboard |
 | Calidad | pytest, ruff, GitHub Actions | Tests, estilo y CI |

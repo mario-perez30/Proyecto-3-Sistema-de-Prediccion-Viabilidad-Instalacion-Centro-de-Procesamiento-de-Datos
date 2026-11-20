@@ -19,9 +19,9 @@ Todas las operaciones se lanzan con `python -m cpd <comando>` (o `cpd <comando>`
 
 ```
 > python -m cpd descargar
-[OK] demanda_diaria: 5803 filas (2011-01-01 → 2026-11-19), huecos=0
-[OK] demanda_ccaa_mensual: 2622 filas (...), huecos=0
-[OK] precio_horario: 112000 filas (...), huecos=...
+[OK] demanda_diaria: 5802 filas (2011-01-01 00:00:00 → 2026-11-19 00:00:00), huecos=0
+[OK] demanda_ccaa_mensual: 2520 filas (2015-01-01 00:00:00 → 2026-08-01 00:00:00), huecos=0
+[OK] precio_horario: 112944 filas (2013-12-31 23:00:00+00:00 → 2026-11-19 22:00:00+00:00), huecos=0
 ```
 
 `[OK]` indica que la tabla ha pasado la validación (sin duplicados ni valores fuera de rango). `[REVISAR]` indica que hay algo que mirar en `data/processed/validacion_electricidad.json`.
@@ -30,11 +30,21 @@ Todas las operaciones se lanzan con `python -m cpd <comando>` (o `cpd <comando>`
 
 ```
 > python -m cpd entrenar consumo
+Datos: {'desde': '2011-01-01', 'hasta': '2026-11-19', 'dias': 5802}
+
 Corto plazo (backtesting diario)
   modelo                         MAE          RMSE   MAPE %   MASE
-  gradient_boosting           ...
-  ingenuo_semanal             ...
+  gradient_boosting         25,967.0      33,708.7     3.55   0.86
+  ingenuo_semanal           39,925.8      52,460.4     5.54   1.32
+  ingenuo_anual             35,762.0      49,544.1     4.88   1.18
+
+Largo plazo (backtesting mensual)
+  modelo                         MAE          RMSE   MAPE %   MASE
+  holt_winters             610,593.9     808,992.0     2.78   0.89
+  ingenuo_anual            722,125.1     947,217.1     3.32   1.05
 ```
+
+(Las fechas en UTC de la tabla de precios corresponden a la medianoche y a las 23:00 hora de Madrid.)
 
 Cómo leer la tabla:
 
