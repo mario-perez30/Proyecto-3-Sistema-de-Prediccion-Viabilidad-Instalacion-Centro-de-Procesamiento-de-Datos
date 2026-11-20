@@ -5,6 +5,7 @@ Uso::
     python -m cpd descargar            # ETL: REE → data/raw → data/processed
     python -m cpd warehouse            # Carga del Data Warehouse (DuckDB)
     python -m cpd entrenar consumo     # Backtesting y entrenamiento de los modelos de demanda
+    python -m cpd entrenar precio      # Lo mismo para el precio del mercado diario
 """
 
 from __future__ import annotations

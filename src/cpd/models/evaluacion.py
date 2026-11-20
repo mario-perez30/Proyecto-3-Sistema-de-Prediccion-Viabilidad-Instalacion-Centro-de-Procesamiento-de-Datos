@@ -87,6 +87,10 @@ def backtesting(
                 }
             )
         )
+    if not resultados:
+        raise ValueError(
+            f"Serie demasiado corta ({n} periodos) para {n_pliegues} cortes de {horizonte} periodos"
+        )
     return pd.concat(resultados, ignore_index=True)
 
 
