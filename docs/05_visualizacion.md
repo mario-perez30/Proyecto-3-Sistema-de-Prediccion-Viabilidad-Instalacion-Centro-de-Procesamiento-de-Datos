@@ -24,9 +24,11 @@ Las visualizaciones del proyecto siguen estos criterios, que se aplican tanto a 
 | Perfil horario del precio por año | Líneas | ¿A qué horas es más barata la energía? | 4.3 |
 | Demanda frente a precio | Dispersión por periodo | ¿Están relacionados? | 4.4 |
 | Demanda por comunidad autónoma | Barras horizontales ordenadas | ¿Dónde se concentra el consumo? | 4.5 |
-| Backtesting | Líneas real / modelo / ingenuo | ¿Es fiable el modelo? | 4.6 |
-| Previsión a 10 años | Línea + intervalo | ¿Cómo evolucionará? | 4.6 |
-| Coste anual del CPD | Barras con rango | ¿Cuánto costará la energía? | 4.7 |
+| Backtesting | Líneas real / modelo / ingenuo | ¿Es fiable el modelo? | 4.7 |
+| Previsión a 10 años | Línea + intervalo | ¿Cómo evolucionará? | 4.7 |
+| Curva diaria y punta por estación | Líneas + barras agrupadas | ¿A qué hora y en qué estación es la punta? | 4.6 |
+| Temperatura y demanda | Dispersión + media por grado; barras por horizonte | ¿Cuánto influye la temperatura? | 4.7 |
+| Coste anual del CPD | Barras con rango | ¿Cuánto costará la energía? | 4.8 |
 
 ## 5.3 Herramientas
 

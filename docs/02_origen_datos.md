@@ -19,6 +19,7 @@ Este informe documenta de dónde sale cada dato, cómo se obtiene, con qué frec
 |---|---|---|---|---|
 | Demanda nacional | `demanda/evolucion` | Diaria | 2011 → ayer | MWh |
 | Demanda por CCAA | `demanda/evolucion` con `geo_limit=ccaa&geo_ids=<id>` | Mensual | 2015 → último mes | MWh |
+| Demanda peninsular en tiempo real (real y prevista por REE) | `demanda/demanda-tiempo-real` | Cada 5 minutos, agregada a horas (media y punta). Un mes por consulta | 2019 → ayer | MW |
 | Precio del mercado diario (spot) | `mercados/precios-mercados-tiempo-real` | Horaria (cuartohoraria desde el 1-10-2025) | 2014 → ayer | €/MWh |
 | PVPC (tarifa regulada) | `mercados/precios-mercados-tiempo-real` | Horaria | 2014 → ayer | €/MWh |
 
@@ -38,6 +39,7 @@ Andalucía 4 · Aragón 5 · Cantabria 6 · Castilla-La Mancha 7 · Castilla y L
 
 - **Zona horaria**: la API devuelve fechas con desfase (`+01:00` en invierno y `+02:00` en verano). Se convierten a UTC para tener una clave única por hora y a hora local de Madrid para el análisis. El último domingo de octubre tiene 25 horas y el de marzo, 23.
 - **Mercado cuartohorario**: desde el 1 de octubre de 2025 el mercado diario casa cada 15 minutos. Para tener una serie homogénea desde 2014 se calcula la media horaria de los cuatro cuartos de hora.
+- **Demanda cada 5 minutos**: solo existe desde el 01-01-2019. Unos 11 días tienen 18 horas sin lecturas en la propia fuente; se dejan como huecos. El apagón del 28-04-2025 se conserva como dato real.
 - **Melilla sin datos**: la API devuelve siempre un error 502 para la demanda de Melilla (`geo_id` 8745). El ETL lo registra como aviso y continúa con las otras 18 comunidades y ciudades autónomas.
 - **Precios nulos y negativos**: desde 2024 son frecuentes las horas con precio 0 o negativo (unas 800-950 al año) por exceso de producción solar y eólica. Son datos reales y no se eliminan, pero impiden usar logaritmos o el error porcentual (MAPE) en los modelos de precio diario.
 

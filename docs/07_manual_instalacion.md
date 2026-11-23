@@ -54,6 +54,7 @@ El fichero `.env` está en `.gitignore`: la clave **nunca** se sube al repositor
 python -m cpd -v descargar         # 1. ETL: REE y AEMET → data/raw → data/processed (10-20 min la primera vez)
 python -m cpd warehouse            # 2. Carga del Data Warehouse DuckDB (segundos)
 python -m cpd entrenar consumo     # 3. Validación y entrenamiento de los modelos de demanda (~2-5 min)
+python -m cpd entrenar punta       #    Modelo de potencia punta y comparación con REE (~3-6 min)
 python -m cpd entrenar precio      # 4. Validación y entrenamiento de los modelos de precio (~2-5 min)
 ```
 

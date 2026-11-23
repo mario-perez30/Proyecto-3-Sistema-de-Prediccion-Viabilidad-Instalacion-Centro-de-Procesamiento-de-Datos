@@ -42,7 +42,7 @@ feature/...    ●    ●    ●    ●                       una rama por funci
 | Rama | Uso |
 |---|---|
 | `main` | Versión estable y entregable. Solo recibe merges desde `desarrollo` y se etiqueta. |
-| `desarrollo` | Rama de integración. Siempre debe pasar la CI. |
+| `desarrollo` | Rama de integración y **rama por defecto** del repositorio (los PR apuntan a ella sin elegirla). Siempre debe pasar la CI. |
 | `feature/<tema>` | Funcionalidad nueva (`feature/etl-electricidad`, `feature/prediccion-consumo`) |
 | `fix/<tema>` | Corrección de errores |
 | `docs/<tema>` | Documentación |
@@ -95,3 +95,10 @@ Formato *Conventional Commits* en español: `tipo(ámbito): resumen en imperativ
 | 3 | `feature/prediccion-consumo` | Variables temporales, backtesting, modelos de consumo |
 | 4 | `feature/prediccion-precio` | Modelos de precio, perfil horario, coste del CPD |
 | 5 | `docs/documentacion-entrega` | Documentación de entrega y generador del documento Word |
+| 6 | `ci/acciones-node24` | Acciones de la CI a versiones con Node 24 |
+| 7 | `feature/temperatura-aemet` | Temperatura de AEMET (ETL, previsión a 7 días y modelo de consumo) |
+| 8 | `feature/etl-demanda-horaria` | Demanda horaria peninsular y potencia punta desde 2019 |
+| 9 | `feature/modelo-punta` | Modelo de potencia punta y comparación con REE |
+| 10 | `docs/demanda-horaria` | Documentación de la demanda horaria y de la punta |
+
+Desde el PR 7 se sigue la regla de **una rama y un PR por implementación** (datos, modelo y documentación por separado). Si una rama depende de otra, primero se fusiona la base y la siguiente se crea desde `desarrollo` actualizado; así se evitan las ramas apiladas.

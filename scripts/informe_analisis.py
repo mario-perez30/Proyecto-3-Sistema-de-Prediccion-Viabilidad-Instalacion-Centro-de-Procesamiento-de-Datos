@@ -19,7 +19,7 @@ import matplotlib.pyplot as plt  # noqa: E402
 import pandas as pd  # noqa: E402
 
 from cpd import config  # noqa: E402
-from cpd.models import consumo, precio  # noqa: E402
+from cpd.models import consumo, precio, punta  # noqa: E402
 from cpd.warehouse import consultar  # noqa: E402
 
 SALIDA = config.RAIZ / "docs" / "figuras"
@@ -218,7 +218,7 @@ def analisis_modelos(objetivo: str, unidad: str, escala: float, resumen: dict) -
     guardar(fig, f"07_backtesting_{objetivo}.png")
 
     prevision = pd.read_csv(carpeta / "prevision_mensual.csv", parse_dates=["mes"])
-    _, mensual = consumo.cargar() if objetivo == "consumo" else precio.cargar()
+    _, mensual = {"consumo": consumo, "precio": precio, "punta": punta}[objetivo].cargar()
     pasado = mensual.historia_
     fig, ax = plt.subplots(figsize=(11, 4))
     ax.plot(pasado.index, pasado / escala, color="black", lw=1, label="Histórico")
@@ -237,10 +237,79 @@ def analisis_modelos(objetivo: str, unidad: str, escala: float, resumen: dict) -
     ax.legend(loc="upper left")
     guardar(fig, f"08_prevision_{objetivo}.png")
     anual = prevision.groupby(prevision["mes"].dt.year)[["prediccion", "inferior", "superior"]]
-    anual = anual.sum() if objetivo == "consumo" else anual.mean()
+    anual = {"consumo": anual.sum, "punta": anual.max}.get(objetivo, anual.mean)()
     resumen[f"prevision_{objetivo}_anual"] = (
         (anual / escala).round(2).reset_index().to_dict(orient="records")
     )
+
+
+def analisis_punta(resumen: dict) -> None:
+    """Perfil horario de la demanda, puntas récord y comparación con la previsión de REE."""
+    horaria = pd.read_parquet(config.PROCESSED_DIR / "demanda_horaria.parquet")
+    horaria = horaria.assign(
+        anio=horaria["fecha_hora"].dt.year,
+        mes=horaria["fecha_hora"].dt.month,
+        hora=horaria["fecha_hora"].dt.hour,
+        laborable=horaria["fecha_hora"].dt.day_of_week < 5,
+    )
+    ultimo = int(horaria["anio"].max())
+    puntas = consultar("SELECT * FROM vw_punta_diaria WHERE horas >= 23")
+    record = puntas.nlargest(5, "punta_mw")[["fecha", "punta_mw", "hora_punta"]]
+    por_anio = puntas.groupby("anio")["punta_mw"].max()
+    invierno = puntas[puntas["mes"].isin([12, 1, 2])].groupby("anio")["punta_mw"].max()
+    verano = puntas[puntas["mes"].isin([6, 7, 8, 9])].groupby("anio")["punta_mw"].max()
+    resumen["punta"] = {
+        "horas": len(horaria),
+        "record": [[str(f.date()), round(p), int(h)] for f, p, h in record.itertuples(index=False)],
+        "punta_max_por_anio_mw": {int(a): round(v) for a, v in por_anio.items()},
+        "punta_invierno_mw": {int(a): round(v) for a, v in invierno.items()},
+        "punta_verano_mw": {int(a): round(v) for a, v in verano.items()},
+    }
+
+    fig, (a1, a2) = plt.subplots(1, 2, figsize=(12, 4.5))
+    laborables = horaria[horaria["laborable"] & (horaria["anio"] == ultimo)]
+    for meses, nombre, color in (
+        ([1, 2], "Enero-febrero", AZUL),
+        ([7, 8], "Julio-agosto", NARANJA),
+        ([4, 5], "Abril-mayo", GRIS),
+    ):
+        perfil = (
+            laborables[laborables["mes"].isin(meses)].groupby("hora")["demanda_mw"].mean() / 1000
+        )
+        a1.plot(perfil.index, perfil, marker="o", ms=3, color=color, label=nombre)
+    a1.set(
+        title=f"Curva de demanda laborable media ({ultimo})",
+        xlabel="Hora",
+        ylabel="GW",
+        xticks=range(0, 24, 2),
+    )
+    a1.legend()
+    anchura = 0.4
+    anios = sorted(set(invierno.index) & set(verano.index))
+    a2.bar(
+        [a - anchura / 2 for a in anios],
+        invierno.loc[anios] / 1000,
+        anchura,
+        color=AZUL,
+        label="Invierno (dic-feb)",
+    )
+    a2.bar(
+        [a + anchura / 2 for a in anios],
+        verano.loc[anios] / 1000,
+        anchura,
+        color=NARANJA,
+        label="Verano (jun-sep)",
+    )
+    a2.set(title="Punta horaria máxima por estación", ylabel="GW", ylim=(35, None))
+    a2.legend(loc="upper left")
+    guardar(fig, "11_punta_perfil_y_estaciones.png")
+
+    metricas = json.loads(
+        (config.MODELS_DIR / "punta" / "metricas.json").read_text(encoding="utf-8")
+    )
+    ree = metricas.get("comparacion_ree_1_dia")
+    if ree:
+        resumen["punta"]["comparacion_ree_1_dia"] = ree
 
 
 def ejemplo_cpd(resumen: dict) -> None:
@@ -354,6 +423,8 @@ def main() -> None:
     analisis_temperatura(demanda, resumen)
     analisis_modelos("consumo", "GWh", 1000, resumen)
     analisis_modelos("precio", "€/MWh", 1, resumen)
+    analisis_punta(resumen)
+    analisis_modelos("punta", "GW", 1000, resumen)
     ejemplo_cpd(resumen)
     (SALIDA / "resumen_analisis.json").write_text(
         json.dumps(resumen, indent=2, ensure_ascii=False, default=str), encoding="utf-8"
