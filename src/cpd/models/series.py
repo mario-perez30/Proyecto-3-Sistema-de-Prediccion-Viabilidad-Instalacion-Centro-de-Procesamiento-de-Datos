@@ -22,7 +22,7 @@ from sklearn.ensemble import HistGradientBoostingRegressor
 from statsmodels.tsa.holtwinters import ExponentialSmoothing
 from statsmodels.tsa.statespace.sarimax import SARIMAX
 
-from cpd.features.temporal import matriz_diaria
+from cpd.features.temporal import climatologia, matriz_diaria, variables_temperatura
 from cpd.models import evaluacion
 
 log = logging.getLogger(__name__)
@@ -67,6 +67,15 @@ class ModeloRecursivo:
     Args:
         log: modelar el logaritmo (solo para series positivas). Estabiliza la varianza y hace
             que los errores se comporten como porcentajes.
+        exogenas: temperatura diaria (columnas de
+            :data:`~cpd.features.temporal.COLUMNAS_TEMPERATURA`) para usarla como variable
+            externa. ``None`` = modelo solo con calendario y retardos.
+        futuro_exogenas: qué temperatura usar en los días a predecir. ``"climatologia"``
+            (la normal de esa fecha; es lo realista, porque el futuro no se conoce) o
+            ``"real"`` (la observada; solo sirve en el backtesting para medir el máximo que
+            aportaría una previsión meteorológica perfecta) o ``"prevision_7d"`` (la observada
+            los 7 primeros días y la normal después: simula usar la previsión de AEMET, que
+            llega a 7 días, suponiendo que acierta).
     """
 
     lags: tuple[int, ...] = (1, 2, 7, 14, 364)
@@ -84,6 +93,8 @@ class ModeloRecursivo:
         }
     )
     bandas: pd.DataFrame | None = None
+    exogenas: pd.DataFrame | None = field(default=None, repr=False)
+    futuro_exogenas: str = "climatologia"
 
     def _transformar(self, serie: pd.Series) -> pd.Series:
         return np.log(serie) if self.log else serie
@@ -91,13 +102,36 @@ class ModeloRecursivo:
     def _invertir(self, valor: float) -> float:
         return float(np.exp(valor)) if self.log else float(valor)
 
-    def _matriz(self, serie: pd.Series) -> pd.DataFrame:
-        return matriz_diaria(serie, self.lags, self.ventanas, self.con_eventos)
+    def _matriz(self, serie: pd.Series, temperatura: pd.DataFrame | None = None) -> pd.DataFrame:
+        externas = variables_temperatura(temperatura) if temperatura is not None else None
+        return matriz_diaria(serie, self.lags, self.ventanas, self.con_eventos, exogenas=externas)
+
+    def _temperatura_para(
+        self, fechas: pd.DatetimeIndex, hasta: pd.Timestamp
+    ) -> pd.DataFrame | None:
+        """Temperatura de ``fechas``: la observada hasta ``hasta`` y, después, la real o la
+        climatológica según ``futuro_exogenas``. La climatología se calcula solo con datos
+        hasta ``hasta`` para no usar información del futuro."""
+        if self.exogenas is None:
+            return None
+        conocida = self.exogenas[self.exogenas.index <= hasta]
+        if self.futuro_exogenas == "real":
+            fuente = self.exogenas
+        elif self.futuro_exogenas == "prevision_7d":  # como una previsión meteorológica a 7 días
+            fuente = self.exogenas[self.exogenas.index <= hasta + pd.Timedelta(days=7)]
+        else:
+            fuente = conocida
+        tabla = fuente.reindex(fechas)[conocida.columns]
+        faltan = tabla.isna().any(axis=1).to_numpy()
+        if faltan.any():
+            tabla.loc[faltan] = climatologia(conocida, fechas[faltan]).to_numpy()
+        return tabla
 
     def ajustar(self, serie: pd.Series) -> ModeloRecursivo:
         """Entrena con toda la serie diaria."""
         objetivo = self._transformar(serie)
-        X = self._matriz(objetivo)
+        temperatura = self._temperatura_para(pd.DatetimeIndex(serie.index), serie.index.max())
+        X = self._matriz(objetivo, temperatura)
         validas = X[f"y_lag{max(self.lags)}"].notna().to_numpy()
         self.modelo_ = HistGradientBoostingRegressor(**self.parametros)
         self.modelo_.fit(X[validas], objetivo[validas])
@@ -110,20 +144,41 @@ class ModeloRecursivo:
         historia = self.historia_ if historia is None else historia
         memoria = max(self.lags) + max(self.ventanas) + 10
         serie = self._transformar(historia.iloc[-memoria:]).copy()
+        todas = pd.date_range(serie.index.min(), fechas.max(), freq="D")
+        temperatura = self._temperatura_para(todas, historia.index.max())
         predicciones = []
         for fecha in fechas:
             serie.loc[fecha] = np.nan
-            fila = self._matriz(serie.asfreq("D")).iloc[[-1]][self.columnas_]
+            continua = serie.asfreq("D")
+            tramo = None if temperatura is None else temperatura.loc[continua.index]
+            fila = self._matriz(continua, tramo).iloc[[-1]][self.columnas_]
             valor = float(self.modelo_.predict(fila)[0])
             serie.loc[fecha] = valor
             predicciones.append(self._invertir(valor))
         return pd.Series(predicciones, index=fechas, name="prediccion")
 
-    def predecir_futuro(self, dias: int = 90) -> pd.DataFrame:
-        """Predicción de los próximos ``dias`` con intervalo del 90 % (si hay bandas)."""
+    def predecir_futuro(
+        self, dias: int = 90, temperatura_prevista: pd.DataFrame | None = None
+    ) -> pd.DataFrame:
+        """Predicción de los próximos ``dias`` con intervalo del 90 % (si hay bandas).
+
+        Args:
+            temperatura_prevista: previsión meteorológica (p. ej. AEMET a 7 días) para los
+                primeros días; el resto usa la temperatura normal de cada fecha.
+        """
         inicio = self.historia_.index.max() + pd.Timedelta(days=1)
         fechas = pd.date_range(inicio, periods=dias, freq="D")
-        prediccion = self.predecir(fechas).to_numpy()
+        if self.exogenas is not None and temperatura_prevista is not None:
+            observada, modo = self.exogenas, self.futuro_exogenas
+            futura = temperatura_prevista[temperatura_prevista.index > observada.index.max()]
+            self.exogenas = pd.concat([observada, futura[observada.columns]])
+            self.futuro_exogenas = "real"
+            try:
+                prediccion = self.predecir(fechas).to_numpy()
+            finally:
+                self.exogenas, self.futuro_exogenas = observada, modo
+        else:
+            prediccion = self.predecir(fechas).to_numpy()
         tabla = pd.DataFrame({"fecha": fechas, "prediccion": prediccion})
         if self.bandas is not None:
             pasos = np.minimum(np.arange(1, dias + 1), self.bandas.index.max())
@@ -140,7 +195,13 @@ class ModeloRecursivo:
 
     def copia_sin_entrenar(self) -> ModeloRecursivo:
         return type(self)(
-            self.lags, self.ventanas, self.log, self.con_eventos, dict(self.parametros)
+            self.lags,
+            self.ventanas,
+            self.log,
+            self.con_eventos,
+            dict(self.parametros),
+            exogenas=self.exogenas,
+            futuro_exogenas=self.futuro_exogenas,
         )
 
     def predictor(self) -> evaluacion.Predictor:
@@ -290,6 +351,10 @@ class ConfiguracionEntrenamiento:
             "ingenuo_anual": evaluacion.ingenuo_estacional(364),
         }
     )
+    #: Previsión meteorológica para la predicción operativa de los próximos días.
+    temperatura_prevista: pd.DataFrame | None = None
+    #: Otros modelos diarios que se comparan en el backtesting (no se guardan).
+    variantes_diarias: dict[str, ModeloRecursivo] = field(default_factory=dict)
 
 
 def _backtesting_comparado(
@@ -320,7 +385,11 @@ def entrenar_y_guardar(serie: pd.Series, conf: ConfiguracionEntrenamiento, carpe
     )  # MAE del ingenuo semanal en todo el histórico
     resultados_d, metricas_d = _backtesting_comparado(
         serie,
-        {"gradient_boosting": conf.diario.predictor(), **conf.referencias_diarias},
+        {
+            "gradient_boosting": conf.diario.predictor(),
+            **{n: m.predictor() for n, m in conf.variantes_diarias.items()},
+            **conf.referencias_diarias,
+        },
         escala,
         n_pliegues=conf.pliegues_diarios,
         horizonte=conf.horizonte_diario,
@@ -352,7 +421,7 @@ def entrenar_y_guardar(serie: pd.Series, conf: ConfiguracionEntrenamiento, carpe
         pd.concat([r.assign(modelo=n) for n, r in resultados.items()], ignore_index=True).to_csv(
             carpeta / f"backtesting_{nombre}.csv", index=False
         )
-    conf.diario.predecir_futuro(conf.dias_prevision).to_csv(
+    conf.diario.predecir_futuro(conf.dias_prevision, conf.temperatura_prevista).to_csv(
         carpeta / "prevision_diaria.csv", index=False
     )
     conf.mensual.predecir_futuro(conf.meses_prevision).to_csv(

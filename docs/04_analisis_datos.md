@@ -4,13 +4,14 @@ Análisis exploratorio de la demanda y el precio de la electricidad en España, 
 
 ## 4.1 Calidad de los datos
 
-Resultado del informe de validación del ETL (`data/processed/validacion_electricidad.json`), última ejecución el 20-11-2026:
+Resultado del informe de validación del ETL (`data/processed/validacion_electricidad.json`), última ejecución el 23-11-2026:
 
 | Tabla | Filas | Periodo | Duplicados | Huecos | Fuera de rango | Observaciones |
 |---|---|---|---|---|---|---|
-| Demanda diaria | 5.802 | 01-01-2011 → 19-11-2026 | 0 | 0 | 0 | Serie completa |
+| Demanda diaria | 5.805 | 01-01-2011 → 22-11-2026 | 0 | 0 | 0 | Serie completa |
 | Demanda mensual por CCAA | 2.520 | 01-2015 → 08-2026 | 0 | 0 | 0 (2 anulados) | Melilla sin datos en la API. Dos valores **negativos** de Cantabria (jul. y ago. 2026) son un error de la fuente: la limpieza los anula |
-| Precio horario | 112.944 | 01-01-2014 → 19-11-2026 | 0 | 0 | 0 | El PVPC solo existe desde el 01-06-2021 (nueva tarifa 2.0TD): 64.991 horas anteriores sin PVPC |
+| Precio horario | 113.016 | 01-01-2014 → 22-11-2026 | 0 | 0 | 0 | El PVPC solo existe desde el 01-06-2021 (nueva tarifa 2.0TD): 64.991 horas anteriores sin PVPC |
+| Temperatura diaria (AEMET) | 5.803 | 01-01-2011 → 20-11-2026 | 0 | 0 | — | 18 estaciones (17,7 con dato de media al día). AEMET publica con ~2 días de retraso; esos días se rellenan con la temperatura normal |
 
 Incidencias encontradas y corregidas durante el desarrollo, todas con un test automático asociado:
 
@@ -18,6 +19,7 @@ Incidencias encontradas y corregidas durante el desarrollo, todas con un test au
 2. La API devuelve error 502 permanente para Melilla. El ETL avisa y continúa.
 3. Demanda autonómica negativa en la fuente. Se anula en la limpieza y no se carga en el warehouse.
 4. Desde octubre de 2025 el precio es cuartohorario. Se agrega a la hora.
+5. AEMET limita las consultas a 6 meses y a unas pocas peticiones por minuto (error 429). El cliente trocea por semestres, pide las 18 estaciones en una sola consulta y espera más tras un 429. Si falta la previsión de una comunidad, los pesos de las demás se reescalan.
 
 ## 4.2 Demanda eléctrica
 
@@ -84,6 +86,7 @@ Aplicando las técnicas de la sesión de *Advanced Feature Engineering*, el mode
 | Ventanas móviles | Media, desviación, mínimo y máximo de 7 y 28 días (precio: también 90) | Nivel y volatilidad recientes, suavizando el ruido |
 | Diferencias | Variación respecto a la semana anterior | Captura la tendencia de corto plazo |
 | Eventos | Confinamiento, crisis del gas, excepción ibérica, apagón | Periodos anómalos que el modelo no puede deducir solo |
+| **Temperatura** (solo consumo) | Temperatura media, máxima y mínima; grados-día de frío (base 15 °C) y de calor (base 21 °C); media de grados-día de los últimos 3 días; máxima del día anterior | La demanda tiene forma de U frente a la temperatura (ver 4.6). La media de 3 días recoge la **inercia térmica** de los edificios en las olas de calor |
 
 Las ventanas se calculan sobre la serie desplazada un día para evitar la **fuga de información** (*data leakage*): un test automático comprueba que la variable del día *t* nunca usa el valor de *t*.
 
@@ -111,15 +114,35 @@ Métricas: MAE, RMSE, MAPE (solo con valores lejos de cero), R² y **MASE**, que
 
 ### Resultados: consumo
 
-**Corto plazo** (12 cortes de 30 días, del 25-11-2025 al 19-11-2026, 360 días predichos):
+**Temperatura.** El análisis de errores del primer modelo mostró que fallaba sobre todo en verano: un 5,6 % de MAPE en septiembre frente a un 1,9 % en octubre, con los peores días del 4 al 8 de septiembre de 2026, una ola de calor. Por eso se añadió la temperatura de AEMET: una estación por comunidad autónoma, ponderada por la demanda eléctrica de cada comunidad.
+
+![Temperatura y demanda](figuras/10_temperatura_demanda.png)
+
+La demanda laborable tiene **forma de U** frente a la temperatura media ponderada: es mínima hacia los **18 °C (658 GWh/día)** y sube con el frío (calefacción) y, más todavía, con el calor (aire acondicionado): **817 GWh/día a 28 °C, un 24 % más**.
+
+Para predecir hace falta la temperatura **futura**, que no se conoce. Se comparan cuatro formas de usarla:
+
+| Modelo | Temperatura en los días a predecir | MAPE días 1-7 | MAPE días 8-30 |
+|---|---|---|---|
+| Sin temperatura | — | 2,51 % | 3,99 % |
+| Temperatura normal | La media histórica de esa fecha (climatología) | 2,99 % | 3,44 % |
+| **Previsión a 7 días (elegido)** | **La previsión de AEMET los 7 primeros días y la normal después** | **1,82 %** | **3,28 %** |
+| Temperatura real | La observada (solo como máximo teórico; en la práctica no se conoce) | 1,82 % | 2,47 % |
+
+En el backtesting, la "previsión" de los 7 primeros días es la temperatura observada. Es una aproximación optimista, porque los errores de la previsión de AEMET a 1-3 días son de 1-2 °C. En producción se usa la previsión real, que el ETL descarga cada día (`prevision_temperatura.parquet`). Usar la temperatura normal desde el primer día empeora los días 1-7: cuando hace un tiempo anormal, la temperatura normal engaña al modelo más que no usar ninguna.
+
+**Corto plazo** (12 cortes de 30 días, del 28-11-2025 al 22-11-2026, 360 días predichos):
 
 | Modelo | MAE (MWh/día) | RMSE (MWh/día) | MAPE | MASE |
 |---|---|---|---|---|
-| **Gradient boosting** | **25.967** | **33.709** | **3,55 %** | **0,86** |
-| Ingenuo semanal | 39.926 | 52.460 | 5,54 % | 1,32 |
-| Ingenuo anual | 35.762 | 49.544 | 4,88 % | 1,18 |
+| **Gradient boosting con temperatura (previsión 7 días)** | **21.395** | **28.265** | **2,94 %** | **0,71** |
+| Gradient boosting sin temperatura | 26.623 | 33.949 | 3,65 % | 0,88 |
+| Gradient boosting con temperatura normal | 24.182 | 30.505 | 3,34 % | 0,80 |
+| Gradient boosting con temperatura real (máximo teórico) | 16.490 | 21.147 | 2,32 % | 0,55 |
+| Ingenuo semanal | 41.252 | 56.690 | 5,69 % | 1,37 |
+| Ingenuo anual | 35.762 | 49.544 | 4,89 % | 1,18 |
 
-El gradient boosting **reduce el error un 35 %** respecto al ingenuo semanal y un 27 % respecto al anual, prediciendo hasta 30 días sin conocer ningún valor real del periodo.
+Con la temperatura, el modelo **reduce el error un 19 %** respecto al mismo modelo sin ella, un 48 % respecto al ingenuo semanal y un 40 % respecto al ingenuo anual. Hasta el 2,32 % de la previsión perfecta queda margen, que se podría aprovechar con previsiones meteorológicas a más de 7 días.
 
 ![Backtesting del consumo](figuras/07_backtesting_consumo.png)
 
@@ -190,7 +213,8 @@ La amplitud entre escenarios (de 10 a 65 M€ al año) muestra que **el precio d
 
 | Conclusión | Evidencia |
 |---|---|
-| La demanda es muy predecible a corto plazo | MAPE del 3,55 % a 30 días, un 35 % mejor que el modelo ingenuo |
+| La demanda es muy predecible a corto plazo | MAPE del 2,94 % a 30 días (1,82 % en la primera semana), un 48 % mejor que el modelo ingenuo |
+| La temperatura es el principal factor externo de la demanda | Forma de U con mínimo a 18 °C; +24 % a 28 °C; −19 % de error al incluirla |
 | La demanda nacional está estable; el crecimiento vendrá de nuevos consumos | Serie plana 2011-2025 y previsión de unos 265 TWh/año |
 | El precio es poco predecible y muy volátil | Mejora pequeña frente al ingenuo; crisis de 2021-2023 y subida de 2026 |
 | El perfil horario del precio ha cambiado por la solar | Valle de 25 €/MWh a mediodía en 2026 |
@@ -199,6 +223,6 @@ La amplitud entre escenarios (de 10 a 65 M€ al año) muestra que **el precio d
 **Limitaciones y mejoras previstas**:
 
 - Añadir como variables el precio del gas (MIBGAS), los derechos de CO₂ y la previsión de producción eólica y solar de REE para mejorar el modelo de precio.
-- Añadir la temperatura (AEMET) al modelo de demanda.
+- Probar previsiones meteorológicas a más de 7 días (AEMET publica tendencias) para acercarse al 2,32 % del máximo teórico.
 - Bajar al nivel municipal: la demanda por municipio no es pública en abierto. Se usará la demanda autonómica y la capacidad de acceso de la red en los nudos (REE) para el factor energético de la puntuación de viabilidad.
 - Incluir peajes, cargos e impuestos de la tarifa de acceso de alta tensión en el coste (`cargos_eur_mwh`).

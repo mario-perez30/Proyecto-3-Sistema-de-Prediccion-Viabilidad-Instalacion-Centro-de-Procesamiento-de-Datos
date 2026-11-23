@@ -31,6 +31,24 @@ FIGURES_DIR: Path = REPORTS_DIR / "figures"
 ZONA_HORARIA: str = "Europe/Madrid"
 
 
+def leer_secreto(nombre: str, fichero: Path | None = None) -> str | None:
+    """Devuelve una credencial de la variable de entorno ``nombre`` o, si no existe, del fichero
+    ``.env`` de la raíz del proyecto (formato ``NOMBRE=valor``, una por línea).
+
+    El ``.env`` está en ``.gitignore``: las credenciales nunca se suben al repositorio.
+    """
+    if os.environ.get(nombre):
+        return os.environ[nombre].strip()
+    ruta = fichero or RAIZ / ".env"
+    if not ruta.exists():
+        return None
+    for linea in ruta.read_text(encoding="utf-8-sig").splitlines():
+        clave, separador, valor = linea.partition("=")
+        if separador and clave.strip() == nombre:
+            return valor.strip().strip("\"'") or None
+    return None
+
+
 def asegurar_directorios() -> None:
     """Crea las carpetas de datos, modelos e informes si no existen."""
     for carpeta in (RAW_DIR, PROCESSED_DIR, WAREHOUSE_DIR, MODELS_DIR, FIGURES_DIR):

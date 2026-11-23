@@ -37,14 +37,54 @@ def cargar_serie_diaria(ruta: Path | None = None) -> pd.Series:
     return serie.interpolate(limit_direction="both")
 
 
-def configuracion(**cambios) -> series.ConfiguracionEntrenamiento:
-    """Configuración por defecto del entrenamiento de consumo."""
+def cargar_temperatura(ruta: Path | None = None) -> pd.DataFrame | None:
+    """Temperatura nacional diaria ponderada (AEMET), o ``None`` si no se ha descargado."""
+    ruta = ruta or config.PROCESSED_DIR / "temperatura_diaria.parquet"
+    if not ruta.exists():
+        return None
+    return (
+        pd.read_parquet(ruta)
+        .set_index("fecha")
+        .drop(columns=["estaciones", "descargada"], errors="ignore")
+    )
+
+
+def configuracion(
+    temperatura: pd.DataFrame | None = None, **cambios
+) -> series.ConfiguracionEntrenamiento:
+    """Configuración por defecto del entrenamiento de consumo.
+
+    Con ``temperatura``, el modelo diario la usa como variable externa (con la temperatura
+    normal de cada fecha para los días futuros) y en el backtesting se compara con:
+
+    El modelo principal se valida simulando el uso real: temperatura conocida los 7 primeros
+    días (lo que cubre la previsión de AEMET, suponiendo que acierta) y la normal de cada
+    fecha a partir del día 8. Se compara con:
+
+    * ``gb_sin_temperatura``: el mismo modelo sin temperatura.
+    * ``gb_climatologia``: con la temperatura normal de cada fecha desde el primer día.
+    * ``gb_temperatura_real``: con la temperatura que hizo de verdad los 30 días. No es
+      aplicable en la práctica, pero indica el máximo que aportaría una previsión perfecta.
+    """
+    base = {"lags": (1, 2, 7, 14, 364), "ventanas": (7, 28), "log": True}
+    variantes = {}
+    if temperatura is not None:
+        variantes = {
+            "gb_sin_temperatura": series.ModeloRecursivo(**base),
+            "gb_climatologia": series.ModeloRecursivo(**base, exogenas=temperatura),
+            "gb_temperatura_real": series.ModeloRecursivo(
+                **base, exogenas=temperatura, futuro_exogenas="real"
+            ),
+        }
     valores = {
         "nombre": "consumo",
         "unidad": "MWh",
-        "diario": series.ModeloRecursivo(lags=(1, 2, 7, 14, 364), ventanas=(7, 28), log=True),
+        "diario": series.ModeloRecursivo(
+            **base, exogenas=temperatura, futuro_exogenas="prevision_7d"
+        ),
         "mensual": series.ModeloMensual(log=True),
         "agregacion_mensual": "sum",
+        "variantes_diarias": variantes,
     }
     valores.update(cambios)
     return series.ConfiguracionEntrenamiento(**valores)
@@ -52,7 +92,13 @@ def configuracion(**cambios) -> series.ConfiguracionEntrenamiento:
 
 def entrenar(serie: pd.Series | None = None, carpeta: Path | None = None, **cambios) -> dict:
     """Valida, entrena y guarda los modelos de consumo en ``models/consumo``."""
-    serie = cargar_serie_diaria() if serie is None else serie
+    if serie is None:
+        serie = cargar_serie_diaria()
+        cambios.setdefault("temperatura", cargar_temperatura())
+        cambios.setdefault(
+            "temperatura_prevista",
+            cargar_temperatura(config.PROCESSED_DIR / "prevision_temperatura.parquet"),
+        )
     return series.entrenar_y_guardar(
         serie, configuracion(**cambios), carpeta or config.MODELS_DIR / CARPETA
     )

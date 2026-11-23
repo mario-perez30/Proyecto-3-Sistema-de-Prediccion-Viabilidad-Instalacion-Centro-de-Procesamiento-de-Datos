@@ -64,6 +64,7 @@ Las zonas generadas no se suben al repositorio (`.gitignore`): se regeneran con 
 | `fact_demanda_diaria` | Día × territorio | `demanda_mwh` |
 | `fact_demanda_mensual` | Mes × comunidad autónoma | `demanda_mwh` |
 | `fact_precio_horario` | Hora (UTC) | `precio_spot_eur_mwh`, `pvpc_eur_mwh` |
+| `fact_temperatura_diaria` | Día × territorio (nacional ponderada y estación de cada comunidad) | `tmed`, `tmax`, `tmin`, `grados_dia_frio`, `grados_dia_calor` |
 
 ### Vistas
 

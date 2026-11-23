@@ -134,3 +134,42 @@ def matriz_diaria(
     if exogenas is not None:
         partes.append(exogenas.reindex(fechas))
     return pd.concat(partes, axis=1)
+
+
+COLUMNAS_TEMPERATURA = ["tmed", "tmax", "tmin", "grados_dia_frio", "grados_dia_calor"]
+
+
+def variables_temperatura(temperatura: pd.DataFrame) -> pd.DataFrame:
+    """Variables de temperatura para la demanda a partir de la serie diaria de AEMET.
+
+    Además del valor del día se usa la **inercia térmica**: tras varios días de calor los
+    edificios están más calientes y el aire acondicionado trabaja más, así que importan la
+    media de grados-día de los últimos 3 días y la temperatura máxima del día anterior.
+    La temperatura es una variable externa (observada o prevista), así que puede usarse el
+    valor del propio día sin fuga de información.
+    """
+    t = temperatura[COLUMNAS_TEMPERATURA]
+    return t.assign(
+        grados_dia_calor_3d=t["grados_dia_calor"].rolling(3, min_periods=1).mean(),
+        grados_dia_frio_3d=t["grados_dia_frio"].rolling(3, min_periods=1).mean(),
+        tmax_ayer=t["tmax"].shift(1),
+    )
+
+
+def climatologia(
+    temperatura: pd.DataFrame, fechas: pd.DatetimeIndex, suavizado: int = 15
+) -> pd.DataFrame:
+    """Temperatura «normal» de cada fecha: media histórica de ese día del año, suavizada.
+
+    Se usa para los días futuros cuya temperatura todavía no se conoce.
+    """
+    historica = temperatura[COLUMNAS_TEMPERATURA].groupby(temperatura.index.day_of_year).mean()
+    historica = historica.reindex(range(1, 367)).interpolate(limit_direction="both")
+    # Media móvil circular: el 31 de diciembre es vecino del 1 de enero.
+    extendida = pd.concat([historica.iloc[-suavizado:], historica, historica.iloc[:suavizado]])
+    suave = (
+        extendida.rolling(suavizado, center=True, min_periods=1).mean().iloc[suavizado:-suavizado]
+    )
+    return pd.DataFrame(
+        suave.loc[fechas.day_of_year].to_numpy(), index=fechas, columns=COLUMNAS_TEMPERATURA
+    )
