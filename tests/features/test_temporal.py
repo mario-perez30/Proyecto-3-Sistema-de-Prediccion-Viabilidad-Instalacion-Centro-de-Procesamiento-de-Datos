@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import pytest
 
 from cpd.features import temporal
 
@@ -42,3 +43,35 @@ def test_matriz_diaria_alinea_exogenas():
     X = temporal.matriz_diaria(serie, lags=(1,), ventanas=(3,), exogenas=exogenas)
     assert X.loc["2024-01-05", "demanda"] == 104
     assert len(X) == 10
+
+
+def _temperatura(fechas: pd.DatetimeIndex, desfase: float = 0.0) -> pd.DataFrame:
+    tmed = 17 + 8 * np.sin(2 * np.pi * (fechas.day_of_year.to_numpy() - 110) / 365.25) + desfase
+    return pd.DataFrame(
+        {
+            "tmed": tmed,
+            "tmax": tmed + 6,
+            "tmin": tmed - 6,
+            "grados_dia_frio": np.clip(15 - tmed, 0, None),
+            "grados_dia_calor": np.clip(tmed - 21, 0, None),
+        },
+        index=fechas,
+    )
+
+
+def test_variables_temperatura_incluye_inercia_termica():
+    fechas = pd.date_range("2024-07-01", periods=5)
+    t = _temperatura(fechas)
+    t["grados_dia_calor"] = [0.0, 3.0, 6.0, 9.0, 0.0]
+    v = temporal.variables_temperatura(t)
+    assert v.loc["2024-07-04", "grados_dia_calor_3d"] == 6.0
+    assert v.loc["2024-07-02", "tmax_ayer"] == t.loc["2024-07-01", "tmax"]
+
+
+def test_climatologia_es_la_media_historica_y_circular():
+    historia = _temperatura(pd.date_range("2015-01-01", "2020-12-31"))
+    futuro = pd.to_datetime(["2021-07-15", "2021-12-31", "2022-01-01"])
+    clima = temporal.climatologia(historia, pd.DatetimeIndex(futuro))
+    esperado = historia["tmed"][historia.index.day_of_year == 196].mean()
+    assert clima.loc["2021-07-15", "tmed"] == pytest.approx(esperado, abs=0.3)
+    assert abs(clima.loc["2021-12-31", "tmed"] - clima.loc["2022-01-01", "tmed"]) < 0.3

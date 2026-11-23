@@ -81,3 +81,81 @@ def test_modelo_reversion_vuelve_a_la_media_con_intervalo_acotado():
     assert prevision["prediccion"].iloc[-1] < 120
     assert prevision["superior"].iloc[-1] < 10 * prevision["prediccion"].iloc[-1]
     assert (prevision["inferior"] < prevision["prediccion"]).all()
+
+
+def _temperatura_y_demanda():
+    fechas = pd.date_range("2020-01-01", "2023-12-31")
+    rng = np.random.default_rng(5)
+    tmed = (
+        17
+        + 8 * np.sin(2 * np.pi * (fechas.day_of_year.to_numpy() - 110) / 365.25)
+        + rng.normal(0, 3, len(fechas))
+    )
+    temperatura = pd.DataFrame(
+        {
+            "tmed": tmed,
+            "tmax": tmed + 6,
+            "tmin": tmed - 6,
+            "grados_dia_frio": np.clip(15 - tmed, 0, None),
+            "grados_dia_calor": np.clip(tmed - 21, 0, None),
+        },
+        index=fechas,
+    )
+    demanda = (
+        700_000 + 15_000 * temperatura["grados_dia_calor"] + 8_000 * temperatura["grados_dia_frio"]
+    )
+    demanda = (
+        demanda + np.where(fechas.day_of_week >= 5, -90_000, 0) + rng.normal(0, 4_000, len(fechas))
+    )
+    return demanda.rename("demanda_mwh"), temperatura
+
+
+def test_temperatura_real_mejora_la_prediccion():
+    demanda, temperatura = _temperatura_y_demanda()
+    historia, futuro = demanda.iloc[:-21], demanda.iloc[-21:]
+    rapido = {"max_iter": 150, "random_state": 0}
+    sin = series.ModeloRecursivo(parametros=rapido).ajustar(historia).predecir(futuro.index)
+    con = (
+        series.ModeloRecursivo(parametros=rapido, exogenas=temperatura, futuro_exogenas="real")
+        .ajustar(historia)
+        .predecir(futuro.index)
+    )
+    assert np.mean(np.abs(con - futuro)) < np.mean(np.abs(sin - futuro))
+
+
+def test_climatologia_no_usa_temperatura_futura():
+    demanda, temperatura = _temperatura_y_demanda()
+    corte = demanda.index[-30]
+    modelo = series.ModeloRecursivo(exogenas=temperatura)
+    alterada = temperatura.copy()
+    alterada.loc[alterada.index > corte] += 15  # si se usara el futuro, cambiaría la predicción
+    modelo_alterado = series.ModeloRecursivo(exogenas=alterada)
+    fechas = pd.date_range(corte + pd.Timedelta(days=1), periods=10)
+    a = modelo._temperatura_para(fechas, corte)
+    b = modelo_alterado._temperatura_para(fechas, corte)
+    pd.testing.assert_frame_equal(a, b)
+    c = series.ModeloRecursivo(exogenas=alterada, futuro_exogenas="prevision_7d")._temperatura_para(
+        fechas, corte
+    )
+    assert (c.iloc[:7]["tmed"] > a.iloc[:7]["tmed"] + 5).all()  # 7 días "previstos"
+    pd.testing.assert_frame_equal(c.iloc[7:], a.iloc[7:])  # después, la normal
+
+
+def test_predecir_futuro_usa_la_prevision_meteorologica():
+    demanda, temperatura = _temperatura_y_demanda()
+    modelo = series.ModeloRecursivo(
+        parametros={"max_iter": 100, "random_state": 0}, exogenas=temperatura
+    )
+    modelo.ajustar(demanda)
+    calor = temperatura.iloc[-3:].copy()
+    calor.index = pd.date_range(demanda.index.max() + pd.Timedelta(days=1), periods=3)
+    calor["tmed"], calor["tmax"], calor["grados_dia_calor"], calor["grados_dia_frio"] = (
+        32.0,
+        40.0,
+        11.0,
+        0.0,
+    )
+    normal = modelo.predecir_futuro(3)
+    ola = modelo.predecir_futuro(3, temperatura_prevista=calor)
+    assert (ola["prediccion"] > normal["prediccion"]).all()
+    assert modelo.futuro_exogenas == "climatologia" and len(modelo.exogenas) == len(temperatura)

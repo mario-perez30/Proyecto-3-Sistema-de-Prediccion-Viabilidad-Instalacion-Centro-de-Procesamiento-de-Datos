@@ -56,3 +56,19 @@ def test_entrenar_guarda_modelos_y_metricas(serie_demanda, tmp_path):
     prevision = diario.predecir_futuro(5)
     assert len(prevision) == 5
     assert (prevision["inferior"] <= prevision["superior"]).all()
+
+
+def test_configuracion_con_temperatura_compara_variantes():
+    temperatura = pd.DataFrame(
+        {c: [1.0] for c in ["tmed", "tmax", "tmin", "grados_dia_frio", "grados_dia_calor"]},
+        index=pd.to_datetime(["2024-01-01"]),
+    )
+    conf = consumo.configuracion(temperatura)
+    assert conf.diario.exogenas is temperatura
+    assert conf.diario.futuro_exogenas == "prevision_7d"
+    assert set(conf.variantes_diarias) == {
+        "gb_sin_temperatura",
+        "gb_climatologia",
+        "gb_temperatura_real",
+    }
+    assert consumo.configuracion().variantes_diarias == {}
