@@ -187,11 +187,56 @@ def construir(
             )
             con.register("fact_mensual_df", fact_mensual)
             con.execute("INSERT INTO fact_demanda_mensual SELECT * FROM fact_mensual_df")
+        temperatura = _hechos_temperatura(origen, id_territorio, dim_fecha)
+        if temperatura is not None:
+            con.execute(ESQUEMA_TEMPERATURA)
+            con.register("fact_temperatura_df", temperatura)
+            con.execute("INSERT INTO fact_temperatura_diaria SELECT * FROM fact_temperatura_df")
         tablas = [
             t
             for (t,) in con.execute("SELECT table_name FROM duckdb_tables() ORDER BY 1").fetchall()
         ]
         return {t: con.execute(f"SELECT count(*) FROM {t}").fetchone()[0] for t in tablas}
+
+
+ESQUEMA_TEMPERATURA = """
+CREATE TABLE fact_temperatura_diaria (
+    fecha_id      INTEGER NOT NULL REFERENCES dim_fecha (fecha_id),
+    territorio_id INTEGER NOT NULL REFERENCES dim_territorio (territorio_id),
+    tmed DOUBLE, tmax DOUBLE, tmin DOUBLE,
+    grados_dia_frio DOUBLE, grados_dia_calor DOUBLE,
+    PRIMARY KEY (fecha_id, territorio_id)
+);
+"""
+
+
+def _hechos_temperatura(
+    origen: Path, id_territorio: dict[str, int], dim_fecha: pd.DataFrame
+) -> pd.DataFrame | None:
+    """Temperatura diaria nacional (ponderada) y de la estación de cada comunidad (AEMET)."""
+    ruta_nacional = origen / "temperatura_diaria.parquet"
+    if not ruta_nacional.exists():
+        return None
+    from cpd.etl.aemet import BASE_CALOR, BASE_FRIO
+
+    columnas = ["tmed", "tmax", "tmin", "grados_dia_frio", "grados_dia_calor"]
+    nacional = pd.read_parquet(ruta_nacional).assign(codigo="ES")
+    partes = [nacional]
+    ruta_estaciones = origen / "temperatura_estaciones.parquet"
+    if ruta_estaciones.exists():
+        estaciones = pd.read_parquet(ruta_estaciones).rename(columns={"codigo_ccaa": "codigo"})
+        estaciones["grados_dia_frio"] = (BASE_FRIO - estaciones["tmed"]).clip(lower=0)
+        estaciones["grados_dia_calor"] = (estaciones["tmed"] - BASE_CALOR).clip(lower=0)
+        partes.append(estaciones[estaciones["codigo"].isin(id_territorio)])
+    tabla = pd.concat([p[["fecha", "codigo", *columnas]] for p in partes], ignore_index=True)
+    tabla = tabla[tabla["fecha"].dt.strftime("%Y%m%d").astype(int).isin(dim_fecha["fecha_id"])]
+    return pd.DataFrame(
+        {
+            "fecha_id": _fecha_id(tabla["fecha"]),
+            "territorio_id": tabla["codigo"].map(id_territorio),
+            **{c: tabla[c] for c in columnas},
+        }
+    ).dropna(subset=["territorio_id"])
 
 
 def consultar(sql: str, ruta_warehouse: Path | None = None) -> pd.DataFrame:
