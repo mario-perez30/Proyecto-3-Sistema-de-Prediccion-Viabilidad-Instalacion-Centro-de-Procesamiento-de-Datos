@@ -206,6 +206,60 @@ def precio_horario(
     return tabla[tabla["fecha_hora"] < fin].reset_index(drop=True)
 
 
+INICIO_DEMANDA_HORARIA = date(2019, 1, 1)
+
+
+def normalizar_demanda_horaria(bruto: pd.DataFrame) -> pd.DataFrame:
+    """Pasa la demanda cada 5 minutos a una fila por hora.
+
+    * ``demanda_mw``: media de la hora. Numéricamente es la energía consumida en esa hora (MWh).
+    * ``demanda_max_mw``: máximo de los 12 valores de 5 minutos: la **potencia punta**
+      instantánea, que es lo que limita la red.
+    * ``demanda_prevista_ree_mw``: previsión de REE para esa hora (media). Sirve para comparar
+      los modelos propios con la previsión oficial.
+
+    Returns:
+        ``fecha_hora_utc | fecha_hora | demanda_mw | demanda_max_mw | demanda_prevista_ree_mw``.
+    """
+    bruto = bruto[bruto["serie"].isin(["Real", "Prevista"])].copy()
+    bruto["fecha_hora_utc"] = bruto["fecha"].dt.floor("h")
+    real = bruto[bruto["serie"] == "Real"].groupby("fecha_hora_utc")["valor"]
+    prevista = bruto[bruto["serie"] == "Prevista"].groupby("fecha_hora_utc")["valor"].mean()
+    tabla = pd.DataFrame(
+        {"demanda_mw": real.mean(), "demanda_max_mw": real.max(), "lecturas": real.count()}
+    )
+    tabla["demanda_prevista_ree_mw"] = prevista.reindex(tabla.index)
+    # Una hora con muy pocas lecturas de 5 minutos no es fiable.
+    tabla = tabla[tabla["lecturas"] >= 6].drop(columns="lecturas").reset_index()
+    tabla["fecha_hora"] = (
+        tabla["fecha_hora_utc"].dt.tz_convert(config.ZONA_HORARIA).dt.tz_localize(None)
+    )
+    columnas = [
+        "fecha_hora_utc",
+        "fecha_hora",
+        "demanda_mw",
+        "demanda_max_mw",
+        "demanda_prevista_ree_mw",
+    ]
+    return tabla[columnas].sort_values("fecha_hora_utc").reset_index(drop=True)
+
+
+def demanda_horaria(
+    cliente: REEClient, desde: date = INICIO_DEMANDA_HORARIA, hasta: date | None = None
+) -> pd.DataFrame:
+    """Demanda horaria peninsular (media y punta en MW) desde 2019 hasta ``hasta`` incluido.
+
+    La API solo ofrece la demanda cada 5 minutos desde el 1 de enero de 2019 y como máximo un
+    mes por consulta. La fuente tiene algunos días incompletos (unos 11 días con ~18 horas sin
+    lecturas); esas horas no se inventan: quedan como huecos en el informe de calidad.
+    """
+    hasta = hasta or _ayer()
+    bruto = cliente.serie("demanda/demanda-tiempo-real", desde, hasta, "hour", trocear_por="month")
+    tabla = normalizar_demanda_horaria(bruto)
+    fin = pd.Timestamp(hasta) + pd.Timedelta(days=1)
+    return tabla[tabla["fecha_hora"] < fin].reset_index(drop=True)
+
+
 # ---------------------------------------------------------------------------
 # Validación
 # ---------------------------------------------------------------------------
@@ -274,7 +328,9 @@ def validar(
 # ---------------------------------------------------------------------------
 
 
-def ejecutar(cliente: REEClient | None = None, incluir_ccaa: bool = True) -> list[InformeCalidad]:
+def ejecutar(
+    cliente: REEClient | None = None, incluir_ccaa: bool = True, incluir_horaria: bool = True
+) -> list[InformeCalidad]:
     """Ejecuta el ETL completo de electricidad y guarda las tablas en ``data/processed``.
 
     Returns:
@@ -313,6 +369,20 @@ def ejecutar(cliente: REEClient | None = None, incluir_ccaa: bool = True) -> lis
             {"precio_spot_eur_mwh": (-500, 3000), "pvpc_eur_mwh": (-500, 3000)},
         )
     )
+
+    if incluir_horaria:
+        horaria = demanda_horaria(cliente)
+        horaria.to_parquet(config.PROCESSED_DIR / "demanda_horaria.parquet", index=False)
+        informes.append(
+            validar(
+                horaria,
+                "demanda_horaria",
+                "fecha_hora_utc",
+                "h",
+                # Mínimo 0: el apagón del 28-04-2025 bajó la demanda a ~2.000 MW y es un dato real.
+                {"demanda_mw": (0, 60_000), "demanda_max_mw": (0, 60_000)},
+            )
+        )
 
     salida = config.PROCESSED_DIR / "validacion_electricidad.json"
     salida.write_text(
