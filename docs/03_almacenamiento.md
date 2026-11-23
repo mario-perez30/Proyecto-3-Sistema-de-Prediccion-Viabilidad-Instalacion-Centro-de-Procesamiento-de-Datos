@@ -65,6 +65,7 @@ Las zonas generadas no se suben al repositorio (`.gitignore`): se regeneran con 
 | `fact_demanda_mensual` | Mes × comunidad autónoma | `demanda_mwh` |
 | `fact_precio_horario` | Hora (UTC) | `precio_spot_eur_mwh`, `pvpc_eur_mwh` |
 | `fact_temperatura_diaria` | Día × territorio (nacional ponderada y estación de cada comunidad) | `tmed`, `tmax`, `tmin`, `grados_dia_frio`, `grados_dia_calor` |
+| `fact_demanda_horaria` | Hora (UTC), sistema peninsular, desde 2019 | `demanda_mw` (media de la hora), `demanda_max_mw` (punta de 5 minutos), `demanda_prevista_ree_mw` |
 
 ### Vistas
 
@@ -72,6 +73,7 @@ Las zonas generadas no se suben al repositorio (`.gitignore`): se regeneran con 
 |---|---|
 | `vw_precio_diario` | Precio medio, mínimo y máximo de cada día con atributos de calendario |
 | `vw_demanda_mensual_nacional` | Demanda nacional agregada por mes |
+| `vw_punta_diaria` | Punta, hora punta, valle, media y nº de horas con dato de cada día (`horas` < 23 = día incompleto en la fuente) |
 
 ### Restricciones de integridad
 

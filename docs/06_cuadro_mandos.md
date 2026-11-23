@@ -27,6 +27,8 @@ El cuadro de mandos es la interfaz de decisión del proyecto: permite a un respo
 | KPI | Cálculo |
 |---|---|
 | Consumo anual del CPD (GWh) | Potencia TI × factor de carga × PUE × 8.760 h |
+| Peso del CPD en la punta (%) | Potencia TI × PUE / punta prevista del sistema |
+| Punta prevista (GW) | Previsión de punta a 30 días y punta máxima anual a 10 años |
 | Coste energético anual (M€) | Consumo × precio previsto (central, optimista y pesimista) |
 | Peso del CPD sobre la demanda nacional (%) | Consumo del CPD / demanda prevista |
 | Precio medio previsto (€/MWh) | Media de la previsión mensual del año |

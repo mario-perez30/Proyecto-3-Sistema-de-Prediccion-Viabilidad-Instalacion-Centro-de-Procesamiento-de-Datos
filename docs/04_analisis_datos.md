@@ -71,7 +71,21 @@ Existe una correlación positiva moderada: los días de más demanda necesitan c
 
 En 2025, **Cataluña (45,3 TWh), Andalucía (41,4 TWh), la Comunidad de Madrid (29,0 TWh) y la Comunitat Valenciana (27,8 TWh)** concentran el 56 % de la demanda. Son también las zonas con más CPD en España (Madrid y Barcelona, según PeeringDB). Para la viabilidad, la demanda autonómica sirve para medir el **peso relativo** de un CPD nuevo sobre la red regional: un CPD de 50 MW pesa mucho más en La Rioja (1,5 TWh) que en Cataluña.
 
-## 4.6 Modelos predictivos
+## 4.6 Demanda horaria y potencia punta
+
+La red eléctrica no se dimensiona para la energía diaria sino para la **punta**: la hora de máxima demanda. Para saber si hay "disponibilidad energética" para un CPD hay que mirar la punta. Desde 2019 REE publica la demanda peninsular cada 5 minutos: 68.969 horas.
+
+| Tabla | Filas | Periodo | Huecos | Observaciones |
+|---|---|---|---|---|
+| Demanda horaria peninsular | 68.969 | 01-01-2019 → 22-11-2026 | 223 horas | Unos 11 días en los que la fuente no tiene lecturas de 03:00 a 21:00 (comprobado pidiéndolos uno a uno). No se inventan: la vista `vw_punta_diaria` cuenta las horas de cada día y el modelo interpola esos días. El apagón del 28-04-2025 (mínimo de unos 2.100 MW) se conserva porque es un dato real |
+
+![Curva diaria y punta por estación](figuras/11_punta_perfil_y_estaciones.png)
+
+- **La forma del día cambia con la estación.** En invierno la punta es a las **20 h** (iluminación y calefacción al volver a casa). En verano es a las **14 h**, con una meseta de 41-42 GW entre las 12 y las 18 h (aire acondicionado). En primavera la curva es mucho más baja.
+- **La punta de verano ya supera a la de invierno.** Hasta 2025 el máximo anual solía ser invernal (récord de 44.153 MW en 2021). En 2026 el verano marcó **45.772 MW el 23-07-2026 a las 14 h**, y las cinco puntas más altas de la serie son de julio y septiembre de 2026, todas a las 14 h.
+- **Consecuencia para un CPD**: su consumo de refrigeración es máximo justo en las horas punta de verano. A cambio, esas mismas horas de mediodía son las de precio más bajo gracias a la solar (sección 4.3), así que la fotovoltaica propia reduce a la vez el coste y el peso sobre la punta.
+
+## 4.7 Modelos predictivos
 
 ### Ingeniería de variables
 
@@ -86,7 +100,7 @@ Aplicando las técnicas de la sesión de *Advanced Feature Engineering*, el mode
 | Ventanas móviles | Media, desviación, mínimo y máximo de 7 y 28 días (precio: también 90) | Nivel y volatilidad recientes, suavizando el ruido |
 | Diferencias | Variación respecto a la semana anterior | Captura la tendencia de corto plazo |
 | Eventos | Confinamiento, crisis del gas, excepción ibérica, apagón | Periodos anómalos que el modelo no puede deducir solo |
-| **Temperatura** (solo consumo) | Temperatura media, máxima y mínima; grados-día de frío (base 15 °C) y de calor (base 21 °C); media de grados-día de los últimos 3 días; máxima del día anterior | La demanda tiene forma de U frente a la temperatura (ver 4.6). La media de 3 días recoge la **inercia térmica** de los edificios en las olas de calor |
+| **Temperatura** (consumo y punta) | Temperatura media, máxima y mínima; grados-día de frío (base 15 °C) y de calor (base 21 °C); media de grados-día de los últimos 3 días; máxima del día anterior | La demanda tiene forma de U frente a la temperatura (ver 4.7). La media de 3 días recoge la **inercia térmica** de los edificios en las olas de calor |
 
 Las ventanas se calculan sobre la serie desplazada un día para evitar la **fuga de información** (*data leakage*): un test automático comprueba que la variable del día *t* nunca usa el valor de *t*.
 
@@ -157,6 +171,40 @@ Con la temperatura, el modelo **reduce el error un 19 %** respecto al mismo mode
 
 **Previsión**: la demanda nacional se estabiliza en torno a **265 TWh/año** (escenario central), con un intervalo del 90 % que se abre de 245-285 TWh en 2027 a 213-330 TWh en 2035. El modelo estadístico no incorpora cambios estructurales futuros (vehículo eléctrico, bombas de calor, hidrógeno, nuevos CPD), que empujarían la demanda hacia la parte alta del intervalo. Por eso el simulador permite añadir el consumo de un CPD concreto sobre esta base (`consumo.anadir_cpd`).
 
+### Resultados: potencia punta
+
+Objetivo: la **punta horaria** de cada día (la mayor de las 24 medias horarias, en MW), la misma definición que usa la previsión oficial de REE. Se usan los modelos genéricos con temperatura y, a largo plazo, la punta máxima de cada mes.
+
+**Corto plazo** (12 cortes de 30 días):
+
+| Modelo | MAPE días 1-7 | MAPE días 8-30 | MAPE total | MAE (MW) |
+|---|---|---|---|---|
+| **Temperatura los días 1-7 y sin ella después (elegido)** | **2,78 %** | **5,92 %** | **5,19 %** | **1.978** |
+| Sin temperatura | 3,90 % | 5,92 % | 5,45 % | 2.078 |
+| Temperatura prevista 7 días y normal después | 2,78 % | 6,87 % | 5,91 % | 2.253 |
+| Temperatura real (máximo teórico) | 2,78 % | 4,96 % | 4,45 % | 1.668 |
+| Ingenuo semanal | 4,04 % | 6,26 % | 5,74 % | 2.115 |
+| Ingenuo anual | 8,00 % | 7,39 % | 7,53 % | 2.863 |
+
+A diferencia de la energía diaria, en la punta **usar la temperatura normal a partir del día 8 empeora el modelo**. La punta depende tanto del calor que, en un verano anómalo como el de 2026, suponer un tiempo normal la infravalora (sesgo del −4,8 %; los peores errores son la ola de calor de septiembre). Se probó a mantener durante unos días la anomalía de temperatura de la última semana, pero mejoraba poco la punta y empeoraba el consumo. La solución elegida es un **modelo por horizonte** (`ModeloPorHorizonte`): el modelo con temperatura los 7 primeros días y el modelo sin temperatura después, que conserva en sus retardos si el periodo está siendo anómalo.
+
+![Backtesting de la punta](figuras/07_backtesting_punta.png)
+
+**Comparación a 1 día con la previsión oficial de REE** (últimos 60 días):
+
+| Previsión | MAE (MW) | MAPE |
+|---|---|---|
+| Previsión oficial de REE | 265 | 0,78 % |
+| Modelo propio (con la temperatura del día) | 700 | 2,04 % |
+
+A 1 día, la previsión de REE es claramente mejor: usa información que no es pública, como la previsión meteorológica horaria o la demanda en tiempo real. El modelo propio no compite en ese horizonte. Su valor está en los horizontes que REE no publica (30 días y 10 años), que son los que importan para decidir la ubicación de un CPD.
+
+**Largo plazo** (3 cortes de 24 meses): Holt-Winters MAPE 5,18 % frente a 5,55 % del ingenuo anual.
+
+![Previsión de la punta a 10 años](figuras/08_prevision_punta.png)
+
+La previsión sitúa la punta anual en unos **47 GW** desde 2027, con un intervalo del 90 % que se abre hasta 35-64 GW en 2035. Hay que tomarla con cautela: con solo 7 años de historia, el modelo extrapola el salto de 2026. Si ese salto es estructural (calor más frecuente, electrificación, nuevos CPD), se marcarían récords cada verano; si fue un año excepcional, la punta volverá a 41-44 GW.
+
 ### Resultados: precio
 
 **Corto plazo** (12 cortes de 30 días):
@@ -188,7 +236,7 @@ Ningún modelo estadístico predice bien el precio a 24 meses: los periodos de v
 | Central (€/MWh) | 82,2 | 62,3 | 59,9 | 59,5 |
 | Intervalo 90 % | 34-198 | 24-160 | 23-154 | 23-153 |
 
-## 4.7 Aplicación al CPD: coste energético
+## 4.8 Aplicación al CPD: coste energético y peso en la punta
 
 Escenario de ejemplo: CPD de **50 MW de potencia TI**, PUE 1,3 y factor de carga del 75 %.
 
@@ -203,17 +251,21 @@ Escenario de ejemplo: CPD de **50 MW de potencia TI**, PUE 1,3 y factor de carga
 
 ![Coste anual de la energía del CPD](figuras/09_coste_cpd_ejemplo.png)
 
+**Peso en la punta.** En la hora punta hay que suponer el CPD a plena potencia: 50 MW × 1,3 = **65 MW**, un **0,14 %** de la punta prevista de 47 GW (`punta.peso_en_punta`). A nivel nacional es poco, pero las redes de distribución y los nudos de conexión tienen capacidades de decenas o centenares de MW. Por eso la disponibilidad real se decidirá por la capacidad de acceso del nudo cercano a cada municipio, que se integrará en la puntuación de viabilidad.
+
 La amplitud entre escenarios (de 10 a 65 M€ al año) muestra que **el precio de la energía es el principal riesgo económico** del CPD. Recomendaciones que se derivan del análisis:
 
 1. Asegurar parte del suministro con **contratos a largo plazo (PPA)** para reducir la exposición al escenario pesimista.
 2. Instalar **fotovoltaica propia**: cubre las horas de mediodía, que ya son las más baratas, así que su valor está en la reducción de consumo de red más que en el arbitraje de precio.
 3. Mejorar el **PUE**: pasar de 1,3 a 1,2 ahorra un 7,7 % de la factura (unos 2 M€/año en el escenario central).
 
-## 4.8 Conclusiones y limitaciones
+## 4.9 Conclusiones y limitaciones
 
 | Conclusión | Evidencia |
 |---|---|
 | La demanda es muy predecible a corto plazo | MAPE del 2,94 % a 30 días (1,82 % en la primera semana), un 48 % mejor que el modelo ingenuo |
+| La punta del sistema ya es de verano y está creciendo | Récord de 45.772 MW el 23-07-2026 a las 14 h; en 2026 la punta de verano supera a la de invierno |
+| La punta es predecible a 1 semana pero difícil a 30 días | MAPE de 2,78 % en los días 1-7 y de 5,92 % en los días 8-30; a 1 día, REE es el referente (0,78 %) |
 | La temperatura es el principal factor externo de la demanda | Forma de U con mínimo a 18 °C; +24 % a 28 °C; −19 % de error al incluirla |
 | La demanda nacional está estable; el crecimiento vendrá de nuevos consumos | Serie plana 2011-2025 y previsión de unos 265 TWh/año |
 | El precio es poco predecible y muy volátil | Mejora pequeña frente al ingenuo; crisis de 2021-2023 y subida de 2026 |

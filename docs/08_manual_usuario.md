@@ -13,6 +13,8 @@ Todas las operaciones se lanzan con `python -m cpd <comando>` (o `cpd <comando>`
 | `python -m cpd descargar --sin-temperatura` | Igual, sin AEMET | Si no hay clave de AEMET o AEMET no responde |
 | `python -m cpd warehouse` | Carga el Data Warehouse DuckDB con las tablas limpias | Después de cada descarga |
 | `python -m cpd entrenar consumo` | Valida y entrena los modelos de demanda y genera las previsiones | Después de cada descarga |
+| `python -m cpd entrenar punta` | Igual para la potencia punta diaria y mensual; además compara la predicción a 1 día con la previsión oficial de REE | Después de cada descarga |
+| `python -m cpd descargar --sin-horaria` | Descarga sin la demanda cada 5 minutos (la más lenta la primera vez) | Actualizaciones rápidas |
 | `python -m cpd entrenar precio` | Lo mismo para el precio de la electricidad | Después de cada descarga |
 | `python -m cpd -v <comando>` | Muestra el detalle del proceso (cada consulta a la API, etc.) | Para seguir el progreso o diagnosticar |
 
@@ -68,6 +70,8 @@ El modelo bueno es el que tiene **menor MAE y MASE** que los modelos ingenuos.
 |---|---|---|
 | `models/consumo/prevision_diaria.csv` | Demanda de los próximos 90 días | `fecha`, `prediccion`, `inferior`, `superior` (MWh) |
 | `models/consumo/prevision_mensual.csv` | Demanda de los próximos 10 años | `mes`, `prediccion`, `inferior`, `superior` (MWh) |
+| `models/punta/prevision_diaria.csv` | Punta horaria de los próximos 90 días | `fecha`, `prediccion`, `inferior`, `superior` (MW) |
+| `models/punta/prevision_mensual.csv` | Punta máxima de cada mes de los próximos 10 años | `mes`, `prediccion`, `inferior`, `superior` (MW) |
 | `models/precio/prevision_diaria.csv` | Precio de los próximos 90 días | `fecha`, `prediccion`, `inferior`, `superior` (€/MWh) |
 | `models/precio/prevision_mensual.csv` | Precio medio mensual de los próximos 10 años | `mes`, `prediccion`, `inferior`, `superior` (€/MWh) |
 | `models/precio/perfil_horario.csv` | Desvío de cada hora sobre la media del día | `mes`, `laborable`, `hora`, `desvio_eur_mwh` |
