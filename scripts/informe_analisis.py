@@ -291,6 +291,59 @@ def ejemplo_cpd(resumen: dict) -> None:
     guardar(fig, "09_coste_cpd_ejemplo.png")
 
 
+def analisis_temperatura(demanda_gwh: pd.Series, resumen: dict) -> None:
+    """Relación temperatura-demanda y aportación de la temperatura al modelo de consumo."""
+    temperatura = consumo.cargar_temperatura()
+    if temperatura is None:
+        return
+    datos = pd.concat({"demanda": demanda_gwh, "tmed": temperatura["tmed"]}, axis=1).dropna()
+    laborables = datos[(datos.index.day_of_week < 5) & (datos.index.year >= 2023)]
+    por_grado = laborables.groupby(laborables["tmed"].round())["demanda"].mean()
+    resumen["temperatura"] = {
+        "temperatura_demanda_minima": float(por_grado.idxmin()),
+        "demanda_laborable_por_grado_gwh": {int(k): round(v, 1) for k, v in por_grado.items()},
+    }
+
+    backtest = pd.read_csv(
+        config.MODELS_DIR / "consumo" / "backtesting_diario.csv", parse_dates=["fecha"]
+    )
+    backtest["ape"] = 100 * (backtest["real"] - backtest["prediccion"]).abs() / backtest["real"]
+    backtest["tramo"] = pd.cut(
+        backtest["paso_horizonte"], [0, 7, 30], labels=["Días 1-7", "Días 8-30"]
+    )
+    nombres = {
+        "gb_sin_temperatura": "Sin temperatura",
+        "gb_climatologia": "Temperatura normal",
+        "gradient_boosting": "Previsión 7 días\n(modelo elegido)",
+        "gb_temperatura_real": "Temperatura real\n(máximo teórico)",
+    }
+    tabla = (
+        backtest[backtest["modelo"].isin(nombres)]
+        .groupby(["modelo", "tramo"], observed=True)["ape"]
+        .mean()
+        .unstack()
+        .reindex(list(nombres))
+    )
+    resumen["temperatura"]["mape_por_tramo"] = tabla.round(2).to_dict(orient="index")
+
+    fig, (a1, a2) = plt.subplots(1, 2, figsize=(12, 4.5))
+    a1.scatter(laborables["tmed"], laborables["demanda"], s=5, alpha=0.3, color=GRIS)
+    a1.plot(por_grado.index, por_grado, color=AZUL, lw=2.5, label="Media por grado")
+    a1.set(
+        title="Demanda laborable y temperatura (2023-hoy)",
+        xlabel="Temperatura media ponderada (°C)",
+        ylabel="GWh/día",
+    )
+    a1.legend()
+    tabla.index = [nombres[m] for m in tabla.index]
+    tabla.plot.bar(ax=a2, color=[AZUL, NARANJA], rot=0)
+    a2.set(
+        title="Error del modelo de consumo según la temperatura usada", ylabel="MAPE (%)", xlabel=""
+    )
+    a2.tick_params(axis="x", labelsize=8)
+    guardar(fig, "10_temperatura_demanda.png")
+
+
 def main() -> None:
     SALIDA.mkdir(parents=True, exist_ok=True)
     resumen: dict = {}
@@ -298,6 +351,7 @@ def main() -> None:
     diario = analisis_precio(resumen)
     analisis_correlacion(demanda, diario, resumen)
     analisis_ccaa(resumen)
+    analisis_temperatura(demanda, resumen)
     analisis_modelos("consumo", "GWh", 1000, resumen)
     analisis_modelos("precio", "€/MWh", 1, resumen)
     ejemplo_cpd(resumen)

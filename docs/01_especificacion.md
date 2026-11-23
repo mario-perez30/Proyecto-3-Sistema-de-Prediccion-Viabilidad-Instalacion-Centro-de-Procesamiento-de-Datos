@@ -61,6 +61,8 @@ El proyecto se divide en módulos con responsable propio que se integran en un �
 | RF-12 | Calcular el coste energético mensual del CPD en escenarios optimista, central y pesimista | Alta | Hecho |
 | RF-13 | Comparar cada modelo con modelos de referencia mediante backtesting y guardar las métricas | Alta | Hecho |
 | RF-14 | Ofrecer todas las operaciones desde una línea de comandos | Media | Hecho |
+| RF-18 | Descargar la temperatura diaria de AEMET (18 estaciones, desde 2011) y su previsión a 7 días, y calcular una temperatura nacional ponderada por demanda | Alta | Hecho |
+| RF-19 | Usar la temperatura (observada y prevista) como variable del modelo de consumo diario | Alta | Hecho |
 | RF-15 | Puntuación de viabilidad 0-100 por municipio | Alta | Pendiente (integración) |
 | RF-16 | Dashboard interactivo con simulador de escenarios | Alta | Pendiente (integración) |
 | RF-17 | Estimación del retorno de la inversión | Media | Pendiente (integración) |
@@ -76,7 +78,7 @@ El proyecto se divide en módulos con responsable propio que se integran en un �
 | RNF-05 | Robustez | Las descargas reintentan con espera exponencial y fallan con un mensaje claro; la caché permite reanudar. |
 | RNF-06 | Portabilidad | Funciona en Windows, Linux y macOS sin servidor de base de datos. |
 | RNF-07 | Escalabilidad | El almacenamiento columnar y el troceo de las descargas permiten añadir fuentes y años sin cambiar la arquitectura. |
-| RNF-08 | Seguridad y privacidad | Solo se usan datos públicos y agregados (sin datos personales, conforme al RGPD); las credenciales irían en `.env`, fuera del control de versiones. |
+| RNF-08 | Seguridad y privacidad | Solo se usan datos públicos y agregados (sin datos personales, conforme al RGPD); las credenciales (clave de AEMET) van en `.env`, fuera del control de versiones, y nunca se muestran en los registros. |
 | RNF-09 | Transparencia | Cada predicción va acompañada de su intervalo de confianza y de las métricas de validación frente a modelos de referencia. |
 | RNF-10 | Licencias | Se respeta y cita la licencia de cada fuente (CC BY 4.0 de REE, etc.). |
 

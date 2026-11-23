@@ -41,7 +41,26 @@ Andalucía 4 · Aragón 5 · Cantabria 6 · Castilla-La Mancha 7 · Castilla y L
 - **Melilla sin datos**: la API devuelve siempre un error 502 para la demanda de Melilla (`geo_id` 8745). El ETL lo registra como aviso y continúa con las otras 18 comunidades y ciudades autónomas.
 - **Precios nulos y negativos**: desde 2024 son frecuentes las horas con precio 0 o negativo (unas 800-950 al año) por exceso de producción solar y eólica. Son datos reales y no se eliminan, pero impiden usar logaritmos o el error porcentual (MAPE) en los modelos de precio diario.
 
-## 2.2 Conectividad (módulo de Arnau Higueras)
+## 2.2 Temperatura: AEMET OpenData
+
+| Atributo | Valor |
+|---|---|
+| Organismo | Agencia Estatal de Meteorología (AEMET) |
+| Acceso | API REST `https://opendata.aemet.es/opendata/api/...` con **clave gratuita** (`AEMET_API_KEY` en `.env`) |
+| Formato | JSON en dos pasos: la consulta devuelve una URL temporal con los datos. Números con coma decimal |
+| Licencia | Reutilización con cita de la fuente ("© AEMET") |
+| Límites | 6 meses por consulta de datos diarios; unas pocas peticiones por minuto (HTTP 429) |
+| Código | `src/cpd/etl/aemet.py` |
+
+| Tabla | Recurso | Contenido | Periodo |
+|---|---|---|---|
+| Temperatura por estación | `valores/climatologicos/diarios/datos/.../estacion/<lista>` | Temperatura media, máxima y mínima diaria de 18 estaciones (una por comunidad: el aeropuerto o el observatorio de la capital) | 2011 → hace ~2 días |
+| Temperatura nacional | Calculada | Media diaria ponderada por la **demanda eléctrica de cada comunidad**, más grados-día de frío y de calor | Ídem |
+| Previsión | `prediccion/especifica/municipio/diaria/<INE>` | Máxima y mínima de los próximos 7 días en el municipio de cada estación | Próximos 7 días |
+
+Estaciones usadas: Sevilla Aeropuerto (AN), Zaragoza Aeropuerto (AR), Santander Aeropuerto (CB), Toledo (CM), Valladolid (CL), Barcelona Aeropuerto (CT), Bilbao Aeropuerto (PV), Asturias Aeropuerto (AS), Ceuta (CE), Madrid Retiro (MD), Pamplona Aeropuerto (NC), València (VC), Badajoz Aeropuerto (EX), Santiago de Compostela Aeropuerto (GA), Palma de Mallorca Aeropuerto (IB), Gran Canaria Aeropuerto (CN), Logroño Aeropuerto (RI) y Murcia (MC).
+
+## 2.3 Conectividad (módulo de Arnau Higueras)
 
 El catálogo completo, con URL, fecha y tamaño de cada descarga, está en [`data/FUENTES.md`](../data/FUENTES.md) y en `data/raw/_descargas.csv`. Resumen:
 
@@ -55,16 +74,16 @@ El catálogo completo, con URL, fecha y tamaño de cada descarga, está en [`dat
 | INE | Relación de municipios 2026 y padrón 1996-2025 | Reutilización con cita |
 | Eurostat GISCO | Contornos municipales y superficie | Reutilización con cita |
 
-## 2.3 Fuentes pendientes (resto de módulos)
+## 2.4 Fuentes pendientes (resto de módulos)
 
 | Área | Fuente prevista | Variables del enunciado |
 |---|---|---|
 | Agua | MITECO (Boletín Hidrológico, embalses), Confederaciones Hidrográficas | Disponibilidad, embalses, estrés hídrico, sequías |
-| Clima | AEMET OpenData (requiere clave gratuita) | Temperatura media y máxima, días de calor extremo, humedad, viento |
+| Clima por municipio | AEMET OpenData (ya integrado para la temperatura de 18 estaciones; falta ampliarlo a todos los municipios) | Temperatura media y máxima, días de calor extremo, humedad, viento |
 | Suelo y riesgos | SNCZI (zonas inundables), IGN (sismicidad), Catastro | Riesgo de inundación y sísmico, precio del suelo |
 | Demografía y economía | INE | Población, densidad, envejecimiento, paro, nivel educativo |
 | Red eléctrica | REE (capacidad de acceso en nudos), CNMC | Subestaciones y capacidad de la red |
 
-## 2.4 Calidad de los datos
+## 2.5 Calidad de los datos
 
 Cada ejecución del ETL genera `data/processed/validacion_electricidad.json` con, por tabla: número de filas, periodo, nulos por columna, duplicados, huecos en el calendario y valores fuera de rango. Los resultados de la última ejecución están en el [informe de análisis](04_analisis_datos.md#41-calidad-de-los-datos).

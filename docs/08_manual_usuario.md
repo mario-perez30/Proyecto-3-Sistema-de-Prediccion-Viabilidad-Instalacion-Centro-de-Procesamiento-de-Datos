@@ -8,8 +8,9 @@ Todas las operaciones se lanzan con `python -m cpd <comando>` (o `cpd <comando>`
 
 | Comando | Qué hace | Cuándo usarlo |
 |---|---|---|
-| `python -m cpd descargar` | Descarga de REE la demanda y los precios, los limpia, los valida y los guarda en el Data Lake | La primera vez y cuando se quieran datos actualizados |
+| `python -m cpd descargar` | Descarga de REE la demanda y los precios, y de AEMET la temperatura y su previsión a 7 días; los limpia, los valida y los guarda en el Data Lake | La primera vez y cada día que se quiera una previsión actualizada |
 | `python -m cpd descargar --sin-ccaa` | Igual, sin la demanda por comunidad autónoma (más rápido) | Actualizaciones rápidas |
+| `python -m cpd descargar --sin-temperatura` | Igual, sin AEMET | Si no hay clave de AEMET o AEMET no responde |
 | `python -m cpd warehouse` | Carga el Data Warehouse DuckDB con las tablas limpias | Después de cada descarga |
 | `python -m cpd entrenar consumo` | Valida y entrena los modelos de demanda y genera las previsiones | Después de cada descarga |
 | `python -m cpd entrenar precio` | Lo mismo para el precio de la electricidad | Después de cada descarga |
@@ -21,7 +22,9 @@ Todas las operaciones se lanzan con `python -m cpd <comando>` (o `cpd <comando>`
 > python -m cpd descargar
 [OK] demanda_diaria: 5802 filas (2011-01-01 00:00:00 → 2026-11-19 00:00:00), huecos=0
 [OK] demanda_ccaa_mensual: 2520 filas (2015-01-01 00:00:00 → 2026-08-01 00:00:00), huecos=0
-[OK] precio_horario: 112944 filas (2013-12-31 23:00:00+00:00 → 2026-11-19 22:00:00+00:00), huecos=0
+[OK] precio_horario: 113016 filas (2013-12-31 23:00:00+00:00 → 2026-11-22 22:00:00+00:00), huecos=0
+[OK] temperatura_diaria: 5803 días (2011-01-01 → 2026-11-20), sin dato=0, estaciones de media=17.7
+[OK] prevision_temperatura: 7 días (2026-11-23 → 2026-11-29)
 ```
 
 `[OK]` indica que la tabla ha pasado la validación (sin duplicados ni valores fuera de rango). `[REVISAR]` indica que hay algo que mirar en `data/processed/validacion_electricidad.json`.
@@ -30,13 +33,16 @@ Todas las operaciones se lanzan con `python -m cpd <comando>` (o `cpd <comando>`
 
 ```
 > python -m cpd entrenar consumo
-Datos: {'desde': '2011-01-01', 'hasta': '2026-11-19', 'dias': 5802}
+Datos: {'desde': '2011-01-01', 'hasta': '2026-11-22', 'dias': 5805}
 
 Corto plazo (backtesting diario)
   modelo                         MAE          RMSE   MAPE %   MASE
-  gradient_boosting         25,967.0      33,708.7     3.55   0.86
-  ingenuo_semanal           39,925.8      52,460.4     5.54   1.32
-  ingenuo_anual             35,762.0      49,544.1     4.88   1.18
+  gradient_boosting         21,395.1      28,264.8     2.94   0.71
+  gb_sin_temperatura        26,622.9      33,948.9     3.65   0.88
+  gb_climatologia           24,182.4      30,504.9     3.34   0.80
+  gb_temperatura_real       16,490.3      21,147.1     2.32   0.55
+  ingenuo_semanal           41,251.5      56,689.9     5.69   1.37
+  ingenuo_anual             35,762.4      49,543.8     4.89   1.18
 
 Largo plazo (backtesting mensual)
   modelo                         MAE          RMSE   MAPE %   MASE
@@ -53,6 +59,8 @@ Cómo leer la tabla:
 - **MASE**: error comparado con el modelo ingenuo semanal. Por debajo de 1, el modelo mejora al ingenuo.
 
 El modelo bueno es el que tiene **menor MAE y MASE** que los modelos ingenuos.
+
+`gradient_boosting` es el modelo que se guarda y se usa: con temperatura, la previsión de AEMET para los primeros 7 días y la temperatura normal después. Las variantes `gb_*` solo se calculan para comparar (sin temperatura, con la normal desde el primer día y con la real, que es el máximo teórico).
 
 ## 8.2 Resultados que se generan
 
