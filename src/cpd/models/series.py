@@ -214,6 +214,70 @@ class ModeloRecursivo:
 
 
 @dataclass
+class ModeloPorHorizonte:
+    """Combina dos modelos diarios: uno para los primeros ``corte`` días y otro para el resto.
+
+    Se usa cuando el backtesting muestra que el mejor modelo cambia con el horizonte. Por
+    ejemplo, en la potencia punta la temperatura prevista mejora mucho la primera semana, pero
+    a partir del día 8 (cuando ya solo se conoce la temperatura normal) es mejor el modelo sin
+    temperatura, que conserva en sus retardos si el periodo está siendo anómalo.
+    """
+
+    corto: ModeloRecursivo
+    largo: ModeloRecursivo
+    corte: int = 7
+    bandas: pd.DataFrame | None = None
+
+    @property
+    def log(self) -> bool:
+        return self.corto.log
+
+    @property
+    def historia_(self) -> pd.Series:
+        return self.corto.historia_
+
+    def ajustar(self, serie: pd.Series) -> ModeloPorHorizonte:
+        self.corto.ajustar(serie)
+        self.largo.ajustar(serie)
+        return self
+
+    def _unir(self, corto: pd.Series, largo: pd.Series) -> pd.Series:
+        return pd.concat([corto.iloc[: self.corte], largo.iloc[self.corte :]]).rename("prediccion")
+
+    def predecir(self, fechas: pd.DatetimeIndex, historia: pd.Series | None = None) -> pd.Series:
+        cortas = fechas[: self.corte]
+        prediccion_corta = self.corto.predecir(cortas, historia)
+        if len(fechas) <= self.corte:
+            return prediccion_corta.rename("prediccion")
+        return self._unir(prediccion_corta, self.largo.predecir(fechas, historia))
+
+    def predecir_futuro(
+        self, dias: int = 90, temperatura_prevista: pd.DataFrame | None = None
+    ) -> pd.DataFrame:
+        corto = self.corto.predecir_futuro(dias, temperatura_prevista).set_index("fecha")[
+            "prediccion"
+        ]
+        largo = self.largo.predecir_futuro(dias).set_index("fecha")["prediccion"]
+        prediccion = self._unir(corto, largo).to_numpy()
+        tabla = pd.DataFrame({"fecha": corto.index, "prediccion": prediccion})
+        if self.bandas is not None:
+            pasos = np.minimum(np.arange(1, dias + 1), self.bandas.index.max())
+            q05 = self.bandas.loc[pasos, "q05"].to_numpy()
+            q95 = self.bandas.loc[pasos, "q95"].to_numpy()
+            tabla["inferior"], tabla["superior"] = prediccion * (1 + q05), prediccion * (1 + q95)
+        return tabla
+
+    def predictor(self) -> evaluacion.Predictor:
+        def predecir(historia: pd.Series, fechas: pd.DatetimeIndex) -> pd.Series:
+            copia = ModeloPorHorizonte(
+                self.corto.copia_sin_entrenar(), self.largo.copia_sin_entrenar(), self.corte
+            )
+            return copia.ajustar(historia).predecir(fechas)
+
+        return predecir
+
+
+@dataclass
 class ModeloMensual:
     """Holt-Winters (suavizado exponencial) con tendencia amortiguada y estacionalidad anual.
 
@@ -335,7 +399,7 @@ class ConfiguracionEntrenamiento:
 
     nombre: str
     unidad: str
-    diario: ModeloRecursivo
+    diario: ModeloRecursivo | ModeloPorHorizonte
     mensual: ModeloMensual | ModeloReversion
     agregacion_mensual: str = "sum"
     pliegues_diarios: int = 12

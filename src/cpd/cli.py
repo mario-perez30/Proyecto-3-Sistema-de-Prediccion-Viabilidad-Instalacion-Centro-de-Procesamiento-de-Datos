@@ -5,6 +5,7 @@ Uso::
     python -m cpd descargar            # ETL: REE y AEMET → data/raw → data/processed
     python -m cpd warehouse            # Carga del Data Warehouse (DuckDB)
     python -m cpd entrenar consumo     # Backtesting y entrenamiento de los modelos de demanda
+    python -m cpd entrenar punta       # Potencia punta diaria (MW) y comparación con REE
     python -m cpd entrenar precio      # Lo mismo para el precio del mercado diario
 """
 
@@ -67,23 +68,31 @@ def _warehouse(_: argparse.Namespace) -> int:
 
 def _imprimir_metricas(nombre: str, metricas: dict[str, dict]) -> None:
     print(f"\n{nombre}")
-    print(f"  {'modelo':<20}{'MAE':>14}{'RMSE':>14}{'MAPE %':>9}{'MASE':>7}")
+    print(f"  {'modelo':<26}{'MAE':>14}{'RMSE':>14}{'MAPE %':>9}{'MASE':>7}")
     for modelo, m in metricas.items():
         mape = f"{m['mape']:.2f}" if "mape" in m else "-"
         print(
-            f"  {modelo:<20}{m['mae']:>14,.1f}{m['rmse']:>14,.1f}{mape:>9}{m.get('mase', 0):>7.2f}"
+            f"  {modelo:<26}{m['mae']:>14,.1f}{m['rmse']:>14,.1f}{mape:>9}{m.get('mase', 0):>7.2f}"
         )
 
 
 def _entrenar(args: argparse.Namespace) -> int:
     if args.objetivo == "consumo":
         from cpd.models import consumo as modulo
+    elif args.objetivo == "punta":
+        from cpd.models import punta as modulo
     else:
         from cpd.models import precio as modulo
     informe = modulo.entrenar()
     print(f"Datos: {informe['datos']}")
     _imprimir_metricas("Corto plazo (backtesting diario)", informe["corto_plazo"]["metricas"])
     _imprimir_metricas("Largo plazo (backtesting mensual)", informe["largo_plazo"]["metricas"])
+    if "comparacion_ree_1_dia" in informe:
+        ree = informe["comparacion_ree_1_dia"]
+        _imprimir_metricas(
+            f"A 1 día frente a la previsión oficial de REE ({ree['dias']} días)",
+            {"modelo_propio": ree["modelo_propio"], "prevision_ree": ree["prevision_ree"]},
+        )
     return 0
 
 
@@ -111,7 +120,7 @@ def crear_parser() -> argparse.ArgumentParser:
     p.set_defaults(func=_warehouse)
 
     p = sub.add_parser("entrenar", help="valida y entrena los modelos predictivos")
-    p.add_argument("objetivo", choices=["consumo", "precio"], help="qué modelo entrenar")
+    p.add_argument("objetivo", choices=["consumo", "punta", "precio"], help="qué modelo entrenar")
     p.set_defaults(func=_entrenar)
     return parser
 
