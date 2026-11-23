@@ -84,6 +84,7 @@ def test_ejecutar_guarda_tablas_e_informe(cliente_falso, tmp_path, monkeypatch):
     monkeypatch.setattr(electricidad, "_ayer", lambda: date(2024, 1, 10))
     monkeypatch.setattr(electricidad.demanda_diaria, "__defaults__", (date(2024, 1, 1), None))
     monkeypatch.setattr(electricidad.precio_horario, "__defaults__", (date(2024, 1, 1), None))
+    monkeypatch.setattr(electricidad.demanda_horaria, "__defaults__", (date(2024, 1, 8), None))
 
     informes = electricidad.ejecutar(cliente_falso, incluir_ccaa=False)
 
@@ -91,6 +92,8 @@ def test_ejecutar_guarda_tablas_e_informe(cliente_falso, tmp_path, monkeypatch):
     assert (tmp_path / "demanda_diaria.parquet").exists()
     assert (tmp_path / "precio_horario.parquet").exists()
     assert (tmp_path / "validacion_electricidad.json").exists()
+    assert (tmp_path / "demanda_horaria.parquet").exists()
+    assert [i.tabla for i in informes][-1] == "demanda_horaria"
 
 
 class _ClienteQueSePasa:
@@ -130,3 +133,24 @@ def test_demanda_ccaa_anula_valores_negativos(cliente_falso, monkeypatch):
     )
     assert tabla["demanda_mwh"].isna().sum() == 1
     assert (tabla["demanda_mwh"].dropna() > 0).all()
+
+
+def test_demanda_horaria_agrega_5_minutos_en_media_y_punta(cliente_falso):
+    tabla = electricidad.demanda_horaria(cliente_falso, date(2024, 3, 4), date(2024, 3, 4))
+    assert len(tabla) == 24
+    diez = tabla[tabla["fecha_hora"] == pd.Timestamp("2024-03-04 10:00")].iloc[0]
+    assert diez["demanda_mw"] == 30_000 + 1_000 + 27.5  # media de los minutos 0..55
+    assert diez["demanda_max_mw"] == 30_000 + 1_000 + 55  # punta de la hora
+    assert diez["demanda_prevista_ree_mw"] == 31_000
+    assert tabla["fecha_hora_utc"].is_unique
+
+
+def test_demanda_horaria_cambio_de_hora_y_horas_incompletas():
+    instantes = pd.date_range(
+        "2024-10-27 00:00", "2024-10-27 23:55", freq="5min", tz="Europe/Madrid"
+    )
+    bruto = pd.DataFrame({"serie": "Real", "fecha": instantes.tz_convert("UTC"), "valor": 25_000.0})
+    tabla = electricidad.normalizar_demanda_horaria(bruto)
+    assert len(tabla) == 25  # el día del cambio de hora de octubre tiene 25 horas
+    incompleta = bruto.iloc[:3]  # solo 3 lecturas de 5 minutos: no es fiable
+    assert electricidad.normalizar_demanda_horaria(incompleta).empty

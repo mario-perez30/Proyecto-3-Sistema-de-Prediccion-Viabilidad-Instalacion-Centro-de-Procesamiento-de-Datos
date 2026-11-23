@@ -18,7 +18,9 @@ import sys
 def _descargar(args: argparse.Namespace) -> int:
     from cpd.etl import electricidad
 
-    informes = electricidad.ejecutar(incluir_ccaa=not args.sin_ccaa)
+    informes = electricidad.ejecutar(
+        incluir_ccaa=not args.sin_ccaa, incluir_horaria=not args.sin_horaria
+    )
     for informe in informes:
         estado = "OK" if informe.correcto else "REVISAR"
         print(
@@ -96,6 +98,11 @@ def crear_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("descargar", help="descarga y limpia los datos de electricidad de REE")
     p.add_argument(
         "--sin-ccaa", action="store_true", help="omite la demanda por comunidad autónoma"
+    )
+    p.add_argument(
+        "--sin-horaria",
+        action="store_true",
+        help="omite la demanda horaria (cada 5 min, desde 2019)",
     )
     p.add_argument("--sin-temperatura", action="store_true", help="omite la temperatura de AEMET")
     p.set_defaults(func=_descargar)

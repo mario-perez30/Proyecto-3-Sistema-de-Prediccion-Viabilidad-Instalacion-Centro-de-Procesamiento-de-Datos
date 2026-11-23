@@ -13,7 +13,7 @@ Esquema (ampliable por el resto de módulos con nuevas dimensiones y hechos)::
                           │
                       fact_precio_horario
 
-Vistas de apoyo: ``vw_precio_diario`` y ``vw_demanda_mensual_nacional``.
+Vistas de apoyo: ``vw_precio_diario``, ``vw_demanda_mensual_nacional`` y ``vw_punta_diaria``.
 """
 
 from __future__ import annotations
@@ -187,6 +187,11 @@ def construir(
             )
             con.register("fact_mensual_df", fact_mensual)
             con.execute("INSERT INTO fact_demanda_mensual SELECT * FROM fact_mensual_df")
+        horaria = _hechos_demanda_horaria(origen, dim_fecha)
+        if horaria is not None:
+            con.execute(ESQUEMA_DEMANDA_HORARIA)
+            con.register("fact_horaria_df", horaria)
+            con.execute("INSERT INTO fact_demanda_horaria SELECT * FROM fact_horaria_df")
         temperatura = _hechos_temperatura(origen, id_territorio, dim_fecha)
         if temperatura is not None:
             con.execute(ESQUEMA_TEMPERATURA)
@@ -197,6 +202,49 @@ def construir(
             for (t,) in con.execute("SELECT table_name FROM duckdb_tables() ORDER BY 1").fetchall()
         ]
         return {t: con.execute(f"SELECT count(*) FROM {t}").fetchone()[0] for t in tablas}
+
+
+ESQUEMA_DEMANDA_HORARIA = """
+CREATE TABLE fact_demanda_horaria (
+    fecha_hora_utc TIMESTAMPTZ PRIMARY KEY,
+    fecha_hora     TIMESTAMP NOT NULL,   -- hora local de Madrid
+    fecha_id       INTEGER NOT NULL REFERENCES dim_fecha (fecha_id),
+    hora           TINYINT NOT NULL,
+    demanda_mw     DOUBLE NOT NULL,      -- media de la hora (= MWh consumidos en la hora)
+    demanda_max_mw DOUBLE NOT NULL,      -- punta instantánea (máximo de 5 minutos)
+    demanda_prevista_ree_mw DOUBLE       -- previsión oficial de REE
+);
+
+CREATE VIEW vw_punta_diaria AS
+SELECT f.fecha, f.anio, f.mes, f.dia_semana, f.festivo,
+       max(h.demanda_max_mw) AS punta_mw,
+       arg_max(h.hora, h.demanda_max_mw) AS hora_punta,
+       min(h.demanda_mw) AS valle_mw,
+       avg(h.demanda_mw) AS media_mw,
+       count(*) AS horas              -- < 23 indica un día incompleto en la fuente
+FROM fact_demanda_horaria h JOIN dim_fecha f USING (fecha_id)
+GROUP BY ALL;
+"""
+
+
+def _hechos_demanda_horaria(origen: Path, dim_fecha: pd.DataFrame) -> pd.DataFrame | None:
+    """Demanda horaria peninsular (media, punta y previsión de REE) desde 2019."""
+    ruta = origen / "demanda_horaria.parquet"
+    if not ruta.exists():
+        return None
+    tabla = pd.read_parquet(ruta)
+    tabla = tabla.assign(fecha_id=_fecha_id(tabla["fecha_hora"]), hora=tabla["fecha_hora"].dt.hour)
+    tabla = tabla[tabla["fecha_id"].isin(dim_fecha["fecha_id"])]
+    columnas = [
+        "fecha_hora_utc",
+        "fecha_hora",
+        "fecha_id",
+        "hora",
+        "demanda_mw",
+        "demanda_max_mw",
+        "demanda_prevista_ree_mw",
+    ]
+    return tabla[columnas]
 
 
 ESQUEMA_TEMPERATURA = """

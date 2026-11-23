@@ -47,6 +47,14 @@ class ClienteFalso:
             horas = pd.date_range(f"{inicio}", f"{fin} 23:00", freq="h", tz="Europe/Madrid")
             filas = [("Precio mercado spot", h.tz_convert("UTC"), 50.0 + h.hour) for h in horas]
             filas += [("PVPC", h.tz_convert("UTC"), 120.0 + h.hour) for h in horas]
+        elif recurso == "demanda/demanda-tiempo-real":
+            # Cada 5 minutos: 30.000 MW + 100 MW por hora del día + minuto (punta al final de la hora).
+            instantes = pd.date_range(f"{inicio}", f"{fin} 23:55", freq="5min", tz="Europe/Madrid")
+            reales = 30_000.0 + 100 * instantes.hour + instantes.minute
+            filas = [
+                ("Real", i.tz_convert("UTC"), v) for i, v in zip(instantes, reales, strict=True)
+            ]
+            filas += [("Prevista", i.tz_convert("UTC"), 31_000.0) for i in instantes]
         elif time_trunc == "month":
             meses = pd.date_range(f"{inicio}", f"{fin}", freq="MS", tz="Europe/Madrid")
             filas = [("Demanda", m.tz_convert("UTC"), 1_000_000.0) for m in meses]

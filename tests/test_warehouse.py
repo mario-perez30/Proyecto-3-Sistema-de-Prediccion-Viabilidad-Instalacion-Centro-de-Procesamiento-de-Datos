@@ -79,3 +79,25 @@ def test_construir_incluye_la_temperatura_si_existe(cliente_falso, tmp_path):
         ruta,
     )
     assert andalucia.loc[0, "gdc"] == 4.0
+
+
+def test_construir_incluye_demanda_horaria_y_vista_de_punta(cliente_falso, tmp_path):
+    electricidad.demanda_diaria(cliente_falso, date(2024, 1, 1), date(2024, 1, 3)).to_parquet(
+        tmp_path / "demanda_diaria.parquet"
+    )
+    electricidad.precio_horario(cliente_falso, date(2024, 1, 1), date(2024, 1, 1)).to_parquet(
+        tmp_path / "precio_horario.parquet"
+    )
+    electricidad.demanda_horaria(cliente_falso, date(2024, 1, 1), date(2024, 1, 3)).to_parquet(
+        tmp_path / "demanda_horaria.parquet"
+    )
+    ruta = tmp_path / "cpd.duckdb"
+
+    filas = warehouse.construir(tmp_path, ruta)
+
+    assert filas["fact_demanda_horaria"] == 72
+    punta = warehouse.consultar("SELECT * FROM vw_punta_diaria ORDER BY fecha", ruta)
+    assert len(punta) == 3
+    assert punta.loc[0, "hora_punta"] == 23
+    assert punta.loc[0, "punta_mw"] == 30_000 + 2_300 + 55
+    assert (punta["horas"] == 24).all()
