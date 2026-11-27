@@ -12,28 +12,48 @@ El cuadro de mandos es la interfaz de decisión del proyecto: permite a un respo
 | Ingeniería | ¿Hay potencia y agua suficientes? ¿Qué peso tendrá el CPD sobre la red? |
 | Sostenibilidad | ¿Huella de carbono? ¿Riesgo hídrico y ambiental? |
 
-## 6.3 Estructura prevista
+## 6.3 Estructura
 
-| Pestaña | Contenido | Módulo que lo alimenta |
-|---|---|---|
-| Ranking de municipios | Mapa y tabla con la puntuación de viabilidad y el desglose por factor | Puntuación (común) |
-| Simulador del CPD | Parámetros del CPD (potencia TI, PUE, refrigeración, tráfico…) → consumo, agua, coste y retorno de la inversión | Simulador (común) |
-| Energía | Previsión de demanda a 90 días y a 10 años, previsión de precio, coste energético del CPD en tres escenarios | Consumo y precio (Mario) |
-| Conectividad | Cobertura de fibra y 5G, distancia a puntos neutros | Conectividad (Arnau) |
-| Calidad de los modelos | Métricas de backtesting frente a los modelos de referencia | Todos |
+Se lanza con `streamlit run app.py`. La lógica de cálculo está en módulos testeados (`cpd.viabilidad`, `cpd.simulador`); el dashboard (`cpd.dashboard`) solo presenta.
 
-### Indicadores clave (KPI) del módulo de energía
+**Barra lateral (parámetros de la decisión)**
 
-| KPI | Cálculo |
+| Grupo | Controles |
 |---|---|
-| Consumo anual del CPD (GWh) | Potencia TI × factor de carga × PUE × 8.760 h |
-| Peso del CPD en la punta (%) | Potencia TI × PUE / punta prevista del sistema |
-| Punta prevista (GW) | Previsión de punta a 30 días y punta máxima anual a 10 años |
-| Coste energético anual (M€) | Consumo × precio previsto (central, optimista y pesimista) |
-| Peso del CPD sobre la demanda nacional (%) | Consumo del CPD / demanda prevista |
-| Precio medio previsto (€/MWh) | Media de la previsión mensual del año |
-| Error del modelo (MAPE / MAE) | Del backtesting más reciente |
+| CPD a instalar | Potencia TI (MW), PUE, factor de carga y peajes y cargos (€/MWh) |
+| Filtros | Habitantes mínimos del municipio; solo sistema peninsular |
+| Pesos | Clima, energía, talento y suelo. Las dimensiones pendientes (conectividad y agua) se indican y su peso se reparte entre el resto |
+
+Cualquier cambio recalcula al momento la puntuación de los 8.132 municipios.
+
+**Pestañas**
+
+| Pestaña | Contenido | Datos |
+|---|---|---|
+| 🗺️ Ranking | Indicadores (candidatos, mejor municipio y validación con los CPD reales), mapa, tabla del ranking con notas por dimensión y descarga en CSV | `cpd.viabilidad`, PeeringDB |
+| 🧮 Simulador | Municipio elegido: puntuación y puesto, consumo anual, coste de la energía (central y rango), huella de carbono, peso en la demanda de su comunidad y en la punta, clima, notas por dimensión y comparación con otros municipios | `cpd.simulador`, `models/precio`, `models/punta` |
+| ⚡ Energía | Previsiones de demanda (90 días y 10 años), de punta (10 años) y de precio (10 años) con intervalo del 90 % | `models/consumo`, `models/punta`, `models/precio` |
+| ✅ Calidad de los modelos | Métricas de backtesting de consumo, punta y precio frente a los modelos de referencia, y comparación de la punta con REE | `models/*/metricas.json` |
+| Conectividad | Pendiente | Módulo de Arnau Higueras |
+
+> **Hueco reservado para el módulo de conectividad (Arnau Higueras).** Se completará cuando el módulo esté integrado en `desarrollo`.
+
+### Indicadores clave (KPI)
+
+| KPI | Cálculo | Dónde |
+|---|---|---|
+| Puntuación y puesto | Análisis multicriterio (ver el informe de análisis, sección 4.9) | Ranking y Simulador |
+| Consumo anual del CPD (GWh) | Potencia TI × factor de carga × PUE × 8.760 h | Simulador |
+| Coste energético anual (M€) | Consumo × (precio previsto del primer año completo + peajes); escenarios optimista, central y pesimista | Simulador |
+| Peso del CPD en la demanda de su comunidad (%) | Consumo del CPD / demanda de los últimos 12 meses de la comunidad | Simulador |
+| Peso del CPD en la punta (%) | Potencia TI × PUE / punta máxima prevista del primer año completo | Simulador |
+| Huella de carbono (kt CO₂/año) | Consumo × 0,12 t CO₂/MWh (factor orientativo del sistema) | Simulador |
+| Validación del ranking | Percentil mediano de los municipios con CPD reales y porcentaje en el 25 % superior | Ranking |
+| Error de cada modelo | MAE, RMSE, MAPE y MASE del backtesting | Calidad de los modelos |
+| Conectividad | Pendiente | — |
 
 ## 6.4 Estado
 
-> Pendiente de la integración de los módulos. Los datos del módulo de energía ya están disponibles en `models/consumo/` y `models/precio/` en el formato que leerá el dashboard (ver el [manual de usuario](08_manual_usuario.md#82-resultados-que-se-generan)).
+Implementado y fusionado en `desarrollo` (PR #15). Se ha probado sin navegador con `streamlit.testing.AppTest` (las cuatro pestañas, sin excepciones) y revisado en el navegador. Si faltan datos, el dashboard indica qué comando ejecutar (`python -m cpd descargar`).
+
+Queda pendiente la **conectividad** (módulo de Arnau Higueras), que entrará como dimensión de la puntuación y, si aporta visualizaciones propias, como pestaña adicional.

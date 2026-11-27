@@ -37,4 +37,16 @@ Las visualizaciones del proyecto siguen estos criterios, que se aplican tanto a 
 
 ## 5.4 Visualizaciones del dashboard
 
-> Se completará cuando se integre el dashboard común (mapa de puntuación por municipio, simulador y comparador).
+El dashboard (`streamlit run app.py`) usa **Plotly**, que es interactivo: zoom, desplazamiento e información al pasar el ratón.
+
+| Visualización | Tipo | Pregunta que responde | Decisión de diseño |
+|---|---|---|---|
+| Mapa de viabilidad | Mapa de puntos sobre cartografía (OpenStreetMap / CARTO) | ¿Dónde están los mejores municipios? | Color continuo *viridis* (legible para daltónicos y en blanco y negro); los CPD existentes, en naranja, para contrastar con el mercado real; los excluidos no se dibujan para no saturar el mapa |
+| Tabla del ranking | Tabla con barras de progreso por dimensión | ¿Por qué un municipio puntúa alto o bajo? | Cada nota de 0 a 100 se ve como una barra, así se comparan dimensiones de un vistazo; punto fuerte y punto débil en texto |
+| Indicadores del simulador | Tarjetas (KPI) | ¿Cuánto consumirá y costará el CPD? ¿Cuánto pesa en la red? | El valor central en grande y el rango optimista-pesimista en la etiqueta, para que la incertidumbre esté siempre a la vista |
+| Nota por dimensión | Barras horizontales 0-100 | ¿En qué falla el municipio elegido? | Escala fija de 0 a 100 para que dos municipios sean comparables |
+| Previsiones de energía | Línea con banda sombreada | ¿Cómo evolucionarán la demanda, la punta y el precio? | La banda del 90 % se dibuja siempre: una previsión sin intervalo transmite una falsa seguridad |
+| Calidad de los modelos | Tablas de métricas | ¿Es fiable cada modelo? | Cada modelo junto a sus modelos de referencia ingenuos y, para la punta, junto a la previsión de REE |
+| Conectividad | — | — | Pendiente |
+
+> **Hueco reservado para el módulo de conectividad (Arnau Higueras).** Se completará cuando el módulo esté integrado en `desarrollo`.

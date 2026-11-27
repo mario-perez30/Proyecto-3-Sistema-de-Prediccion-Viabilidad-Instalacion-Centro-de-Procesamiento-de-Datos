@@ -104,5 +104,7 @@ Formato *Conventional Commits* en español: `tipo(ámbito): resumen en imperativ
 | 12 | `feature/etl-clima-municipal` | Clima reciente de cada municipio con todas las estaciones de AEMET |
 | 13 | `feature/puntuacion` | Puntuación multicriterio de viabilidad y validación con CPD reales |
 | 14 | `docs/puntuacion` | Documentación de la puntuación |
+| 15 | `feature/dashboard` | Dashboard Streamlit y simulador |
+| 16 | `docs/dashboard` | Documentación del dashboard (huecos para la conectividad) |
 
 Desde el PR 7 se sigue la regla de **una rama y un PR por implementación** (datos, modelo y documentación por separado). Si una rama depende de otra, primero se fusiona la base y la siguiente se crea desde `desarrollo` actualizado; así se evitan las ramas apiladas.

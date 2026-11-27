@@ -30,4 +30,4 @@ y queda en `docs/entrega/Proyecto3_Documentacion.docx`.
 |---|---|
 | 1, 2, 3, 7, 9 | Redactados para los módulos de electricidad. Se amplían al integrar el resto de módulos. |
 | 4 | Con los resultados reales de los modelos de consumo y precio. |
-| 5, 6, 8 | Estructura preparada; se completan con el dashboard. |
+| 5, 6, 8 | Redactados con el dashboard; con huecos reservados para la conectividad (Arnau Higueras). |
