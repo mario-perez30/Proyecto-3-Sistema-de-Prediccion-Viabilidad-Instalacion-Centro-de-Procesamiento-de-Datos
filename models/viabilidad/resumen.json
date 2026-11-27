@@ -1,0 +1,31 @@
+{
+  "cpd": {
+    "potencia_it_mw": 50.0,
+    "pue": 1.3,
+    "factor_carga": 0.75
+  },
+  "filtros": {
+    "poblacion_50km_minima": 100000,
+    "poblacion_municipio_minima": 5000,
+    "excluir_extrapeninsulares": false
+  },
+  "dimensiones_usadas": {
+    "clima": 0.333,
+    "energia": 0.2,
+    "talento": 0.4,
+    "suelo": 0.067
+  },
+  "dimensiones_pendientes": {
+    "conectividad": "Arnau Higueras",
+    "agua": "por asignar"
+  },
+  "municipios": 8132,
+  "excluidos": 6840,
+  "validacion_cpd_existentes": {
+    "cpd": 69,
+    "municipios_con_cpd": 37,
+    "percentil_mediano": 77.4,
+    "pct_en_el_25_superior": 52.2,
+    "pct_en_el_10_superior": 5.8
+  }
+}
