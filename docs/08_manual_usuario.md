@@ -120,4 +120,32 @@ El esquema completo está en el [informe de almacenamiento](03_almacenamiento.md
 
 ## 8.5 Dashboard
 
-> Pendiente de la integración de los módulos. Se lanzará con `streamlit run app.py` y se documentará en esta sección y en el [informe del cuadro de mandos](06_cuadro_mandos.md).
+### Arrancarlo
+
+Con el entorno virtual activado y los datos descargados (manual de instalación, apartado 7.4):
+
+```powershell
+streamlit run app.py
+```
+
+Se abre en el navegador en `http://localhost:8501`. Para cerrarlo, pulsa Ctrl+C en la terminal.
+
+### Uso paso a paso
+
+1. **Describe el CPD** en la barra lateral: potencia TI (por ejemplo 50 MW), PUE (1,3 es habitual en un CPD moderno), factor de carga y, si los conoces, los peajes y cargos de tu tarifa (€/MWh).
+2. **Ajusta los filtros**: habitantes mínimos del municipio (5.000 por defecto) y, si solo te interesa la península, marca "Solo sistema peninsular".
+3. **Ajusta los pesos** si quieres dar más importancia a un criterio. Los pesos se normalizan solos: no hace falta que sumen 1.
+4. En **🗺️ Ranking**, mira el mapa (pasa el ratón por un punto para ver el municipio y su puntuación) y la tabla. Con el control deslizante eliges cuántos municipios ver; con el botón descargas todos en CSV.
+5. En **🧮 Simulador**, escribe o elige un municipio. Verás su puntuación, el consumo y el coste anual del CPD (con el rango entre el escenario optimista y el pesimista), su peso en la red y su clima. En "Comparar con" añade otros municipios para verlos lado a lado.
+6. En **⚡ Energía** y **✅ Calidad de los modelos** tienes las previsiones y la fiabilidad de cada modelo.
+
+### Cómo interpretar los resultados
+
+- La **puntuación** (0-100) es relativa: compara cada municipio con el resto de candidatos, no es una probabilidad de éxito.
+- Un municipio **excluido** no aparece en el ranking; en el simulador se indica el motivo.
+- El **coste** es solo de la energía. No incluye la inversión, el personal ni el agua.
+- Mientras falte la conectividad, la puntuación no tiene en cuenta la fibra ni los puntos neutros.
+
+### Conectividad
+
+> **Hueco reservado para el módulo de conectividad (Arnau Higueras).** Se completará cuando el módulo esté integrado en `desarrollo`.
