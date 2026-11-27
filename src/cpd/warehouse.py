@@ -192,6 +192,11 @@ def construir(
             con.execute(ESQUEMA_MUNICIPIO)
             con.register("dim_municipio_df", municipios)
             con.execute("INSERT INTO dim_municipio SELECT * FROM dim_municipio_df")
+            clima = _clima_municipio(origen)
+            if clima is not None:
+                con.execute(ESQUEMA_CLIMA_MUNICIPIO)
+                con.register("clima_municipio_df", clima)
+                con.execute("INSERT INTO fact_clima_municipio SELECT * FROM clima_municipio_df")
         horaria = _hechos_demanda_horaria(origen, dim_fecha)
         if horaria is not None:
             con.execute(ESQUEMA_DEMANDA_HORARIA)
@@ -247,6 +252,28 @@ def _dim_municipio(origen: Path, id_territorio: dict[str, int]) -> pd.DataFrame 
             "lon": tabla["lon"],
         }
     )
+
+
+ESQUEMA_CLIMA_MUNICIPIO = """
+CREATE TABLE fact_clima_municipio (
+    codigo_ine     VARCHAR PRIMARY KEY REFERENCES dim_municipio (codigo_ine),
+    indicativo     VARCHAR NOT NULL,      -- estación de AEMET más cercana
+    estacion       VARCHAR,
+    altitud_estacion DOUBLE,
+    distancia_km   DOUBLE,
+    tmed_anual     DOUBLE,
+    tmax_media_verano DOUBLE,
+    dias_calor_35  DOUBLE,                -- días al año con máxima >= 35 °C
+    grados_dia_refrigeracion DOUBLE,      -- suma anual de max(0, tmed - 21)
+    tmax_absoluta  DOUBLE
+);
+"""
+
+
+def _clima_municipio(origen: Path) -> pd.DataFrame | None:
+    """Clima reciente de cada municipio (estación de AEMET más cercana)."""
+    ruta = origen / "clima_municipios.parquet"
+    return pd.read_parquet(ruta) if ruta.exists() else None
 
 
 ESQUEMA_DEMANDA_HORARIA = """
