@@ -259,11 +259,76 @@ La amplitud entre escenarios (de 10 a 65 M€ al año) muestra que **el precio d
 2. Instalar **fotovoltaica propia**: cubre las horas de mediodía, que ya son las más baratas, así que su valor está en la reducción de consumo de red más que en el arbitraje de precio.
 3. Mejorar el **PUE**: pasar de 1,3 a 1,2 ahorra un 7,7 % de la factura (unos 2 M€/año en el escenario central).
 
-## 4.9 Conclusiones y limitaciones
+## 4.9 Puntuación de viabilidad por municipio
+
+### Datos territoriales
+
+| Tabla | Fuente | Contenido |
+|---|---|---|
+| Municipios | INE (relación 2026 y padrón 2025 y 2015) + Eurostat GISCO (LAU 2024) | 8.132 municipios y 49.114.494 habitantes; población, crecimiento a 10 años, superficie, densidad y centroide. Todos con coordenadas dentro de España; 15 sin población de 2015 porque se crearon después |
+| Clima municipal | AEMET, datos diarios 2023-2025 de todas las estaciones | 831 estaciones válidas (≥ 80 % de días) de 926. Cada municipio recibe la más cercana: 12 km de media, 41 km como máximo. Ejemplos: Córdoba tiene 84 días al año ≥ 35 °C y 841 grados-día; Lugo, 5 días y 83 grados-día |
+| CPD existentes | PeeringDB | 69 CPD con coordenadas (21 en Madrid capital, 6 en Barcelona…), usados solo para **validar** |
+
+### Método: análisis multicriterio
+
+1. Para cada municipio se calculan las variables según el CPD que se quiere instalar (por defecto, 50 MW TI, PUE 1,3 y carga del 75 %).
+2. **Exclusiones**: municipios con menos de 5.000 habitantes (sin suelo industrial, servicios ni accesos para un CPD grande), con menos de 100.000 habitantes a 50 km (sin personal técnico) o sin datos. Opcionalmente, islas, Ceuta y Melilla. Quedan **1.292 candidatos**.
+3. Cada variable se normaliza de 0 a 100 entre los candidatos (min-max recortado a los percentiles 2 y 98).
+4. Las variables se agregan en dimensiones y las dimensiones, con sus pesos, en la puntuación global. Las dimensiones sin datos se excluyen y se reescalan las demás.
+
+| Dimensión | Variables (peso interno) | Peso | Peso efectivo hoy |
+|---|---|---|---|
+| Clima | Grados-día de refrigeración (50 %), días ≥ 35 °C (30 %), máxima absoluta (20 %) | 25 % | 33 % |
+| Energía | Consumo del CPD sobre la demanda de su comunidad (60 %), sistema peninsular (40 %) | 15 % | 20 % |
+| Conectividad | Pendiente (Arnau Higueras) | 20 % | — |
+| Talento | Población a 50 km, en escala logarítmica (70 %); crecimiento a 10 años (30 %) | 30 % | 40 % |
+| Suelo | Cercanía a una densidad periurbana de 1.000 hab/km² | 5 % | 7 % |
+| Agua | Pendiente | 5 % | — |
+
+### Validación con los CPD existentes
+
+Si la puntuación tiene sentido, los municipios donde el mercado ya ha construido CPD deberían salir bien puntuados. Cada uno de los 69 CPD de PeeringDB se asigna a su municipio y se mira su percentil:
+
+| Versión | Percentil mediano | En el 25 % superior | Problema |
+|---|---|---|---|
+| Primera | 24 | 0 % | Premiaba pueblos de montaña remotos: Capileira, en Sierra Nevada, salía 2.º |
+| **Final** | **77** | **52 %** | — |
+
+Los cambios entre la primera versión y la final tienen sentido por sí mismos, no solo porque mejoren el resultado:
+
+- el mínimo de 5.000 habitantes por municipio;
+- más peso al talento, que mide la cercanía a un área metropolitana (personal, clientes y fibra);
+- el suelo valora una densidad **periurbana** (polígonos industriales) y no "cuanto menos denso, mejor";
+- menos peso a la energía, que apenas distingue entre municipios peninsulares;
+- la escala se calcula solo entre candidatos.
+
+Hay riesgo de sobreajustar al mercado actual, así que los pesos se presentan como configurables, no como verdad.
+
+![Mapa de viabilidad](figuras/12_mapa_viabilidad.png)
+
+### Resultado (CPD de 50 MW)
+
+| Puesto | Municipio | Provincia | Puntuación |
+|---|---|---|---|
+| 1 | Becerril de la Sierra | Madrid | 92,0 |
+| 2 | Guadarrama | Madrid | 88,4 |
+| 3 | Cercedilla | Madrid | 88,3 |
+| 4 | Masquefa | Barcelona | 88,2 |
+| 5 | Vacarisses | Barcelona | 87,6 |
+| 7 | San Lorenzo de El Escorial | Madrid | 86,3 |
+| 10 | **Tres Cantos** | Madrid | 85,0 |
+| 20 | Colmenar Viejo | Madrid | 82,9 |
+
+Los mejores municipios son de la **sierra de Madrid** (clima fresco a menos de 50 km de la capital) y del **entorno de Barcelona** (Baix Llobregat, Vallès y Maresme). **Tres Cantos**, uno de los polos reales de CPD de Madrid, sale 10.º de 1.292. Las grandes ciudades bajan por el clima y por la falta de suelo (Madrid capital, 276.ª; Sevilla, 1.092.ª, con la peor nota de clima).
+
+**Limitación principal:** falta la **conectividad**, que es lo que más pesa en las decisiones reales (puntos neutros, fibra y latencia con los clientes) y explica que la mitad de los CPD reales aún no estén en el 25 % superior. Cuando Arnau integre su módulo entrará con un 20 % de peso, sin cambiar el resto.
+
+## 4.10 Conclusiones y limitaciones
 
 | Conclusión | Evidencia |
 |---|---|
 | La demanda es muy predecible a corto plazo | MAPE del 2,94 % a 30 días (1,82 % en la primera semana), un 48 % mejor que el modelo ingenuo |
+| La mejor ubicación para un CPD grande hoy es la periferia fresca de Madrid y Barcelona | Puntuación multicriterio validada con los CPD reales (percentil mediano 77) |
 | La punta del sistema ya es de verano y está creciendo | Récord de 45.772 MW el 23-07-2026 a las 14 h; en 2026 la punta de verano supera a la de invierno |
 | La punta es predecible a 1 semana pero difícil a 30 días | MAPE de 2,78 % en los días 1-7 y de 5,92 % en los días 8-30; a 1 día, REE es el referente (0,78 %) |
 | La temperatura es el principal factor externo de la demanda | Forma de U con mínimo a 18 °C; +24 % a 28 °C; −19 % de error al incluirla |

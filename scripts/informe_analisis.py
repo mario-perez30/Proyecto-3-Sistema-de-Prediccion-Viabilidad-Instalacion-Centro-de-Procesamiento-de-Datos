@@ -413,6 +413,57 @@ def analisis_temperatura(demanda_gwh: pd.Series, resumen: dict) -> None:
     guardar(fig, "10_temperatura_demanda.png")
 
 
+def analisis_viabilidad(resumen: dict) -> None:
+    """Mapa de la puntuación de viabilidad y validación con los CPD reales."""
+    ruta = config.MODELS_DIR / "viabilidad" / "puntuacion_municipios.csv"
+    if not ruta.exists():
+        return
+    tabla = pd.read_csv(ruta, dtype={"codigo_ine": str})
+    candidatos = tabla[~tabla["excluido"]]
+    peninsula = tabla[(tabla["lat"] > 35.5) & (tabla["lon"] > -10)]
+    resumen["viabilidad"] = {
+        "candidatos": len(candidatos),
+        "excluidos_por_motivo": tabla["motivo_exclusion"].fillna("").value_counts().to_dict(),
+        "top20": candidatos.head(20)[["ranking", "nombre", "provincia", "puntuacion"]].to_dict(
+            orient="records"
+        ),
+        "validacion": json.loads((ruta.parent / "resumen.json").read_text(encoding="utf-8")),
+    }
+    from cpd.viabilidad import cpd_existentes
+
+    existentes = cpd_existentes()
+    existentes = existentes[(existentes["lat"] > 35.5) & (existentes["lon"] > -10)]
+    fig, ax = plt.subplots(figsize=(10, 8))
+    excluidos = peninsula[peninsula["excluido"]]
+    ax.scatter(excluidos["lon"], excluidos["lat"], s=2, color="#D9D9D9", label="Excluido")
+    validos = peninsula[~peninsula["excluido"]]
+    puntos = ax.scatter(
+        validos["lon"],
+        validos["lat"],
+        c=validos["puntuacion"],
+        s=9,
+        cmap="viridis",
+        label="Candidato",
+    )
+    ax.scatter(
+        existentes["lon"],
+        existentes["lat"],
+        marker="x",
+        s=30,
+        color=NARANJA,
+        label="CPD existente (PeeringDB)",
+    )
+    fig.colorbar(puntos, ax=ax, shrink=0.7, label="Puntuación de viabilidad (0-100)")
+    ax.set(
+        title="Viabilidad para un CPD de 50 MW por municipio (península y Baleares)",
+        xlabel="Longitud",
+        ylabel="Latitud",
+    )
+    ax.set_aspect(1.25)
+    ax.legend(loc="lower right", markerscale=2)
+    guardar(fig, "12_mapa_viabilidad.png")
+
+
 def main() -> None:
     SALIDA.mkdir(parents=True, exist_ok=True)
     resumen: dict = {}
@@ -425,6 +476,7 @@ def main() -> None:
     analisis_modelos("precio", "€/MWh", 1, resumen)
     analisis_punta(resumen)
     analisis_modelos("punta", "GW", 1000, resumen)
+    analisis_viabilidad(resumen)
     ejemplo_cpd(resumen)
     (SALIDA / "resumen_analisis.json").write_text(
         json.dumps(resumen, indent=2, ensure_ascii=False, default=str), encoding="utf-8"
