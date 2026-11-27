@@ -122,9 +122,17 @@ class AEMETClient:
             time.sleep(espera)
         raise AEMETError(f"No se pudo descargar {url.split('?')[0]}: {ultimo}")
 
-    def diarios(self, inicio: date, fin: date, indicativos: list[str]) -> list[dict]:
-        """Valores climatológicos diarios de varias estaciones (periodo ≤ 6 meses)."""
-        ruta = self.carpeta_raw / "diarios" / f"{inicio:%Y%m%d}_{fin:%Y%m%d}.json"
+    def diarios(
+        self, inicio: date, fin: date, indicativos: list[str], clave: str | None = None
+    ) -> list[dict]:
+        """Valores climatológicos diarios de varias estaciones (periodo ≤ 6 meses, ≤ 25 estaciones).
+
+        Args:
+            clave: nombre del fichero de caché cuando se descargan varios lotes de estaciones
+                del mismo periodo (por defecto, solo las fechas).
+        """
+        nombre = clave or f"{inicio:%Y%m%d}_{fin:%Y%m%d}"
+        ruta = self.carpeta_raw / "diarios" / f"{nombre}.json"
         if ruta.exists() and fin < date.today() - timedelta(days=7):
             return json.loads(ruta.read_text(encoding="utf-8"))
         url = (
@@ -138,6 +146,41 @@ class AEMETClient:
         ruta.write_text(json.dumps(filas, ensure_ascii=False), encoding="utf-8")
         time.sleep(self.pausa)
         return filas
+
+
+URL_INVENTARIO = "https://opendata.aemet.es/opendata/api/valores/climatologicos/inventarioestaciones/todasestaciones"
+
+
+def _grados(texto: str) -> float:
+    """Coordenada de AEMET en grados, minutos y segundos (``394924N``, ``025309W``) a decimal."""
+    texto = texto.strip()
+    hemisferio, cifras = texto[-1], texto[:-1]
+    grados, minutos, segundos = int(cifras[:-4]), int(cifras[-4:-2]), int(cifras[-2:])
+    valor = grados + minutos / 60 + segundos / 3600
+    return -valor if hemisferio in "SW" else valor
+
+
+def inventario(cliente: AEMETClient) -> pd.DataFrame:
+    """Todas las estaciones de AEMET: ``indicativo | nombre | provincia | altitud | lat | lon``."""
+    ruta = cliente.carpeta_raw / "inventario_estaciones.json"
+    if ruta.exists():
+        filas = json.loads(ruta.read_text(encoding="utf-8"))
+    else:
+        enlace = cliente._get(URL_INVENTARIO)
+        time.sleep(cliente.pausa)
+        filas = cliente._get(enlace["datos"], con_clave=False)
+        ruta.parent.mkdir(parents=True, exist_ok=True)
+        ruta.write_text(json.dumps(filas, ensure_ascii=False), encoding="utf-8")
+    return pd.DataFrame(
+        {
+            "indicativo": [f["indicativo"] for f in filas],
+            "nombre": [f["nombre"] for f in filas],
+            "provincia": [f["provincia"] for f in filas],
+            "altitud": [_numero(f["altitud"]) for f in filas],
+            "lat": [_grados(f["latitud"]) for f in filas],
+            "lon": [_grados(f["longitud"]) for f in filas],
+        }
+    )
 
 
 def _numero(valor) -> float:

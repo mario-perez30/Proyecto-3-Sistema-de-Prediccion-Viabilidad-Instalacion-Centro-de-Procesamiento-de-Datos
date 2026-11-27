@@ -59,6 +59,15 @@ def _descargar_temperatura() -> bool:
         f"[{estado}] temperatura_diaria: {resumen.dias} días ({resumen.desde} → {resumen.hasta}), "
         f"sin dato={resumen.dias_sin_dato}, estaciones de media={resumen.estaciones_media}"
     )
+    if (config.PROCESSED_DIR / "municipios.parquet").exists():
+        from cpd.etl import clima_municipal
+
+        clima = clima_municipal.ejecutar()
+        print(
+            f"[OK] clima_municipios: {clima.municipios} municipios con {clima.estaciones_validas} "
+            f"estaciones válidas de {clima.estaciones_inventario}; distancia media a la estación "
+            f"{clima.distancia_media_km} km (máx. {clima.distancia_max_km} km)"
+        )
     prevision = aemet.ejecutar_prevision()
     print(
         f"[OK] prevision_temperatura: {len(prevision)} días "
