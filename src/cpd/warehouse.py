@@ -197,6 +197,13 @@ def construir(
                 con.execute(ESQUEMA_CLIMA_MUNICIPIO)
                 con.register("clima_municipio_df", clima)
                 con.execute("INSERT INTO fact_clima_municipio SELECT * FROM clima_municipio_df")
+            transporte = _transporte_municipio(origen)
+            if transporte is not None:
+                con.execute(ESQUEMA_TRANSPORTE_MUNICIPIO)
+                con.register("transporte_municipio_df", transporte)
+                con.execute(
+                    "INSERT INTO fact_transporte_municipio SELECT * FROM transporte_municipio_df"
+                )
         horaria = _hechos_demanda_horaria(origen, dim_fecha)
         if horaria is not None:
             con.execute(ESQUEMA_DEMANDA_HORARIA)
@@ -273,6 +280,23 @@ CREATE TABLE fact_clima_municipio (
 def _clima_municipio(origen: Path) -> pd.DataFrame | None:
     """Clima reciente de cada municipio (estación de AEMET más cercana)."""
     ruta = origen / "clima_municipios.parquet"
+    return pd.read_parquet(ruta) if ruta.exists() else None
+
+
+ESQUEMA_TRANSPORTE_MUNICIPIO = """
+CREATE TABLE fact_transporte_municipio (
+    codigo_ine     VARCHAR PRIMARY KEY REFERENCES dim_municipio (codigo_ine),
+    dist_salida_autovia_km DOUBLE NOT NULL,  -- salida de autopista/autovía más cercana (OSM)
+    aeropuerto_iata VARCHAR NOT NULL,        -- aeropuerto con vuelos regulares más cercano
+    aeropuerto     VARCHAR,
+    dist_aeropuerto_km DOUBLE NOT NULL       -- distancias en línea recta desde el centroide
+);
+"""
+
+
+def _transporte_municipio(origen: Path) -> pd.DataFrame | None:
+    """Accesibilidad por carretera y avión de cada municipio."""
+    ruta = origen / "transporte_municipios.parquet"
     return pd.read_parquet(ruta) if ruta.exists() else None
 
 
