@@ -7,6 +7,7 @@ Uso::
     python -m cpd entrenar consumo     # Backtesting y entrenamiento de los modelos de demanda
     python -m cpd entrenar punta       # Potencia punta diaria (MW) y comparación con REE
     python -m cpd entrenar precio      # Lo mismo para el precio del mercado diario
+    python -m cpd puntuar              # Puntuación de viabilidad de cada municipio
 """
 
 from __future__ import annotations
@@ -115,6 +116,37 @@ def _entrenar(args: argparse.Namespace) -> int:
     return 0
 
 
+def _puntuar(args: argparse.Namespace) -> int:
+    from cpd import viabilidad
+
+    cpd = viabilidad.ParametrosCPD(args.potencia_mw, args.pue, args.factor_carga)
+    filtros = viabilidad.Filtros(
+        poblacion_municipio_minima=args.poblacion_minima,
+        excluir_extrapeninsulares=args.excluir_islas,
+    )
+    resultado = viabilidad.ejecutar(cpd, filtros=filtros)
+    tabla = resultado.tabla
+    usadas = ", ".join(f"{d} {p:.0%}" for d, p in tabla.attrs["dimensiones_usadas"].items())
+    pendientes = ", ".join(f"{d} ({r})" for d, r in tabla.attrs["dimensiones_pendientes"].items())
+    print(
+        f"CPD: {args.potencia_mw} MW TI, PUE {args.pue} → {cpd.consumo_anual_mwh / 1000:,.0f} GWh/año"
+    )
+    print(f"Dimensiones usadas: {usadas}")
+    print(f"Pendientes: {pendientes}")
+    print(f"Candidatos: {(~tabla['excluido']).sum()} de {len(tabla)} municipios\n")
+    columnas = ["ranking", "nombre", "provincia", "puntuacion"] + [
+        c for c in tabla.columns if c.startswith("nota_")
+    ]
+    print(tabla.head(args.top)[columnas].to_string(index=False))
+    if resultado.validacion:
+        v = resultado.validacion
+        print(
+            f"\nValidación con {v['cpd']} CPD existentes (PeeringDB): percentil mediano "
+            f"{v['percentil_mediano']}; {v['pct_en_el_25_superior']} % en el 25 % superior"
+        )
+    return 0
+
+
 def crear_parser() -> argparse.ArgumentParser:
     """Define los subcomandos disponibles."""
     parser = argparse.ArgumentParser(prog="cpd", description="Plataforma de viabilidad de CPD")
@@ -140,6 +172,15 @@ def crear_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("warehouse", help="carga las tablas limpias en el Data Warehouse (DuckDB)")
     p.set_defaults(func=_warehouse)
+
+    p = sub.add_parser("puntuar", help="puntuación de viabilidad de cada municipio para un CPD")
+    p.add_argument("--potencia-mw", type=float, default=50.0, help="potencia TI del CPD (MW)")
+    p.add_argument("--pue", type=float, default=1.3, help="PUE del CPD")
+    p.add_argument("--factor-carga", type=float, default=0.75, help="uso medio de la potencia")
+    p.add_argument("--poblacion-minima", type=float, default=5000, help="habitantes mínimos")
+    p.add_argument("--excluir-islas", action="store_true", help="solo sistema peninsular")
+    p.add_argument("--top", type=int, default=20, help="municipios que se muestran")
+    p.set_defaults(func=_puntuar)
 
     p = sub.add_parser("entrenar", help="valida y entrena los modelos predictivos")
     p.add_argument("objetivo", choices=["consumo", "punta", "precio"], help="qué modelo entrenar")
