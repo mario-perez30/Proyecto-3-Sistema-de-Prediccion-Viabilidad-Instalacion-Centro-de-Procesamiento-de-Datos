@@ -187,6 +187,11 @@ def construir(
             )
             con.register("fact_mensual_df", fact_mensual)
             con.execute("INSERT INTO fact_demanda_mensual SELECT * FROM fact_mensual_df")
+        municipios = _dim_municipio(origen, id_territorio)
+        if municipios is not None:
+            con.execute(ESQUEMA_MUNICIPIO)
+            con.register("dim_municipio_df", municipios)
+            con.execute("INSERT INTO dim_municipio SELECT * FROM dim_municipio_df")
         horaria = _hechos_demanda_horaria(origen, dim_fecha)
         if horaria is not None:
             con.execute(ESQUEMA_DEMANDA_HORARIA)
@@ -202,6 +207,46 @@ def construir(
             for (t,) in con.execute("SELECT table_name FROM duckdb_tables() ORDER BY 1").fetchall()
         ]
         return {t: con.execute(f"SELECT count(*) FROM {t}").fetchone()[0] for t in tablas}
+
+
+ESQUEMA_MUNICIPIO = """
+CREATE TABLE dim_municipio (
+    codigo_ine     VARCHAR PRIMARY KEY,   -- 5 cifras: provincia + municipio
+    nombre         VARCHAR NOT NULL,
+    provincia      VARCHAR,
+    ccaa_id        INTEGER REFERENCES dim_territorio (territorio_id),
+    poblacion      INTEGER,
+    poblacion_hace_10 INTEGER,
+    crecimiento_10a_pct DOUBLE,
+    superficie_km2 DOUBLE,
+    densidad_hab_km2 DOUBLE,
+    lat            DOUBLE,
+    lon            DOUBLE
+);
+"""
+
+
+def _dim_municipio(origen: Path, id_territorio: dict[str, int]) -> pd.DataFrame | None:
+    """Municipios (INE + padrón + GISCO) enlazados a su comunidad de ``dim_territorio``."""
+    ruta = origen / "municipios.parquet"
+    if not ruta.exists():
+        return None
+    tabla = pd.read_parquet(ruta)
+    return pd.DataFrame(
+        {
+            "codigo_ine": tabla["codigo_ine"],
+            "nombre": tabla["nombre"],
+            "provincia": tabla["provincia"],
+            "ccaa_id": tabla["codigo_ccaa"].map(id_territorio).astype("Int64"),
+            "poblacion": tabla["poblacion"].astype("Int64"),
+            "poblacion_hace_10": tabla["poblacion_hace_10"].astype("Int64"),
+            "crecimiento_10a_pct": tabla["crecimiento_10a_pct"],
+            "superficie_km2": tabla["superficie_km2"],
+            "densidad_hab_km2": tabla["densidad_hab_km2"],
+            "lat": tabla["lat"],
+            "lon": tabla["lon"],
+        }
+    )
 
 
 ESQUEMA_DEMANDA_HORARIA = """
