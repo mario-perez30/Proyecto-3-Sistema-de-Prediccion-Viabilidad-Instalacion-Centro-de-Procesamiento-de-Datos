@@ -672,6 +672,168 @@
       "superior": 63.45
     }
   ],
+  "viabilidad": {
+    "candidatos": 1292,
+    "excluidos_por_motivo": {
+      "municipio más pequeño que el mínimo": 5513,
+      "menos de la población mínima a 50 km": 1311,
+      "": 1292,
+      "datos incompletos": 16
+    },
+    "top20": [
+      {
+        "ranking": 1.0,
+        "nombre": "Becerril de la Sierra",
+        "provincia": "Madrid",
+        "puntuacion": 92.0
+      },
+      {
+        "ranking": 2.0,
+        "nombre": "Guadarrama",
+        "provincia": "Madrid",
+        "puntuacion": 88.4
+      },
+      {
+        "ranking": 3.0,
+        "nombre": "Cercedilla",
+        "provincia": "Madrid",
+        "puntuacion": 88.3
+      },
+      {
+        "ranking": 4.0,
+        "nombre": "Masquefa",
+        "provincia": "Barcelona",
+        "puntuacion": 88.2
+      },
+      {
+        "ranking": 5.0,
+        "nombre": "Vacarisses",
+        "provincia": "Barcelona",
+        "puntuacion": 87.6
+      },
+      {
+        "ranking": 6.0,
+        "nombre": "Piera",
+        "provincia": "Barcelona",
+        "puntuacion": 86.4
+      },
+      {
+        "ranking": 7.0,
+        "nombre": "San Lorenzo de El Escorial",
+        "provincia": "Madrid",
+        "puntuacion": 86.3
+      },
+      {
+        "ranking": 8.0,
+        "nombre": "Sant Antoni de Vilamajor",
+        "provincia": "Barcelona",
+        "puntuacion": 85.8
+      },
+      {
+        "ranking": 9.0,
+        "nombre": "Abrera",
+        "provincia": "Barcelona",
+        "puntuacion": 85.3
+      },
+      {
+        "ranking": 10.0,
+        "nombre": "Tres Cantos",
+        "provincia": "Madrid",
+        "puntuacion": 85.0
+      },
+      {
+        "ranking": 11.0,
+        "nombre": "Olesa de Montserrat",
+        "provincia": "Barcelona",
+        "puntuacion": 84.4
+      },
+      {
+        "ranking": 12.0,
+        "nombre": "Esparreguera",
+        "provincia": "Barcelona",
+        "puntuacion": 84.3
+      },
+      {
+        "ranking": 12.0,
+        "nombre": "Santa Maria de Palautordera",
+        "provincia": "Barcelona",
+        "puntuacion": 84.3
+      },
+      {
+        "ranking": 14.0,
+        "nombre": "Sant Pere de Vilamajor",
+        "provincia": "Barcelona",
+        "puntuacion": 84.2
+      },
+      {
+        "ranking": 15.0,
+        "nombre": "Cardedeu",
+        "provincia": "Barcelona",
+        "puntuacion": 83.7
+      },
+      {
+        "ranking": 15.0,
+        "nombre": "Sant Andreu de Llavaneres",
+        "provincia": "Barcelona",
+        "puntuacion": 83.7
+      },
+      {
+        "ranking": 17.0,
+        "nombre": "Viladecavalls",
+        "provincia": "Barcelona",
+        "puntuacion": 83.5
+      },
+      {
+        "ranking": 18.0,
+        "nombre": "Sitges",
+        "provincia": "Barcelona",
+        "puntuacion": 83.1
+      },
+      {
+        "ranking": 19.0,
+        "nombre": "Sant Vicenç de Montalt",
+        "provincia": "Barcelona",
+        "puntuacion": 83.0
+      },
+      {
+        "ranking": 20.0,
+        "nombre": "Colmenar Viejo",
+        "provincia": "Madrid",
+        "puntuacion": 82.9
+      }
+    ],
+    "validacion": {
+      "cpd": {
+        "potencia_it_mw": 50.0,
+        "pue": 1.3,
+        "factor_carga": 0.75
+      },
+      "filtros": {
+        "poblacion_50km_minima": 100000,
+        "poblacion_municipio_minima": 5000,
+        "excluir_extrapeninsulares": false
+      },
+      "dimensiones_usadas": {
+        "clima": 0.333,
+        "energia": 0.2,
+        "talento": 0.4,
+        "suelo": 0.067
+      },
+      "dimensiones_pendientes": {
+        "conectividad": "Arnau Higueras",
+        "agua": "por asignar"
+      },
+      "municipios": 8132,
+      "excluidos": 6840,
+      "validacion_cpd_existentes": {
+        "cpd": 69,
+        "municipios_con_cpd": 37,
+        "percentil_mediano": 77.4,
+        "pct_en_el_25_superior": 52.2,
+        "pct_en_el_10_superior": 5.8
+      }
+    }
+  },
   "ejemplo_cpd_50mw": {
     "energia_anual_gwh": 427.0,
     "peso_sobre_demanda_nacional_pct": 0.162,

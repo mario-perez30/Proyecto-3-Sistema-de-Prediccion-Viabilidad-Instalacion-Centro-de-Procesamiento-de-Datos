@@ -65,7 +65,11 @@ El proyecto se divide en módulos con responsable propio que se integran en un �
 | RF-19 | Usar la temperatura (observada y prevista) como variable del modelo de consumo diario | Alta | Hecho |
 | RF-20 | Descargar la demanda peninsular cada 5 minutos (desde 2019) y obtener la demanda horaria, la punta y la previsión oficial de REE | Alta | Hecho |
 | RF-21 | Predecir la potencia punta diaria (30 días) y mensual (10 años), compararla con la previsión de REE y calcular el peso de un CPD sobre la punta | Alta | Hecho |
-| RF-15 | Puntuación de viabilidad 0-100 por municipio | Alta | Pendiente (integración) |
+| RF-15 | Puntuación de viabilidad 0-100 por municipio | Alta | Hecho (clima, energía, talento y suelo; faltan conectividad y agua) |
+| RF-22 | Integrar los 8.132 municipios del INE con población, superficie y coordenadas | Alta | Hecho |
+| RF-23 | Calcular el clima reciente de cada municipio con todas las estaciones de AEMET | Alta | Hecho |
+| RF-24 | Excluir municipios por condiciones mínimas y explicar el punto fuerte y el débil de cada uno | Media | Hecho |
+| RF-25 | Validar la puntuación con los CPD existentes (PeeringDB) | Media | Hecho |
 | RF-16 | Dashboard interactivo con simulador de escenarios | Alta | Pendiente (integración) |
 | RF-17 | Estimación del retorno de la inversión | Media | Pendiente (integración) |
 

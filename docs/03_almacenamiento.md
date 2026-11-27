@@ -65,6 +65,8 @@ Las zonas generadas no se suben al repositorio (`.gitignore`): se regeneran con 
 | `fact_demanda_mensual` | Mes × comunidad autónoma | `demanda_mwh` |
 | `fact_precio_horario` | Hora (UTC) | `precio_spot_eur_mwh`, `pvpc_eur_mwh` |
 | `fact_temperatura_diaria` | Día × territorio (nacional ponderada y estación de cada comunidad) | `tmed`, `tmax`, `tmin`, `grados_dia_frio`, `grados_dia_calor` |
+| `dim_municipio` | Municipio (código INE) | Nombre, provincia, comunidad (`ccaa_id` → `dim_territorio`), población, crecimiento, superficie, densidad y coordenadas |
+| `fact_clima_municipio` | Municipio | Estación de AEMET más cercana y su distancia, temperatura media, máxima de verano, días ≥ 35 °C, grados-día de refrigeración y máxima absoluta |
 | `fact_demanda_horaria` | Hora (UTC), sistema peninsular, desde 2019 | `demanda_mw` (media de la hora), `demanda_max_mw` (punta de 5 minutos), `demanda_prevista_ree_mw` |
 
 ### Vistas

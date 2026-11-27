@@ -62,7 +62,19 @@ Andalucía 4 · Aragón 5 · Cantabria 6 · Castilla-La Mancha 7 · Castilla y L
 
 Estaciones usadas: Sevilla Aeropuerto (AN), Zaragoza Aeropuerto (AR), Santander Aeropuerto (CB), Toledo (CM), Valladolid (CL), Barcelona Aeropuerto (CT), Bilbao Aeropuerto (PV), Asturias Aeropuerto (AS), Ceuta (CE), Madrid Retiro (MD), Pamplona Aeropuerto (NC), València (VC), Badajoz Aeropuerto (EX), Santiago de Compostela Aeropuerto (GA), Palma de Mallorca Aeropuerto (IB), Gran Canaria Aeropuerto (CN), Logroño Aeropuerto (RI) y Murcia (MC).
 
-## 2.3 Conectividad (módulo de Arnau Higueras)
+## 2.3 Territorio: INE, Eurostat GISCO, AEMET (todas las estaciones) y PeeringDB
+
+| Fuente | Fichero o recurso | Uso | Licencia |
+|---|---|---|---|
+| INE | `diccionario26.xlsx` (relación de municipios) | Código INE, nombre y comunidad de los 8.132 municipios | Reutilización con cita |
+| INE | `pobmun.zip` (padrón 1996-2025) | Población de 2025 y 2015 | Reutilización con cita |
+| Eurostat GISCO | `LAU_RG_01M_2024_4326.geojson` (150 MB, se descarga una vez) | Superficie y centroide del polígono principal de cada municipio | © EuroGeographics, con cita |
+| AEMET | Inventario y datos diarios de las 926 estaciones (2023-2025), en lotes de 25 | Clima reciente de cada municipio (estación más cercana) | © AEMET |
+| PeeringDB | `api/fac?country=ES` | 69 CPD existentes con coordenadas, solo para validar la puntuación | Reutilización con cita |
+
+Los Excel del INE cambian la fila de la cabecera según el año; el lector la detecta buscando la columna `CPRO`.
+
+## 2.4 Conectividad (módulo de Arnau Higueras)
 
 El catálogo completo, con URL, fecha y tamaño de cada descarga, está en [`data/FUENTES.md`](../data/FUENTES.md) y en `data/raw/_descargas.csv`. Resumen:
 
@@ -76,7 +88,7 @@ El catálogo completo, con URL, fecha y tamaño de cada descarga, está en [`dat
 | INE | Relación de municipios 2026 y padrón 1996-2025 | Reutilización con cita |
 | Eurostat GISCO | Contornos municipales y superficie | Reutilización con cita |
 
-## 2.4 Fuentes pendientes (resto de módulos)
+## 2.5 Fuentes pendientes (resto de módulos)
 
 | Área | Fuente prevista | Variables del enunciado |
 |---|---|---|
@@ -86,6 +98,6 @@ El catálogo completo, con URL, fecha y tamaño de cada descarga, está en [`dat
 | Demografía y economía | INE | Población, densidad, envejecimiento, paro, nivel educativo |
 | Red eléctrica | REE (capacidad de acceso en nudos), CNMC | Subestaciones y capacidad de la red |
 
-## 2.5 Calidad de los datos
+## 2.6 Calidad de los datos
 
 Cada ejecución del ETL genera `data/processed/validacion_electricidad.json` con, por tabla: número de filas, periodo, nulos por columna, duplicados, huecos en el calendario y valores fuera de rango. Los resultados de la última ejecución están en el [informe de análisis](04_analisis_datos.md#41-calidad-de-los-datos).

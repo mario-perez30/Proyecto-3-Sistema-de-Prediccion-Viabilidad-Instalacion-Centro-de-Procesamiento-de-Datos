@@ -55,6 +55,7 @@ python -m cpd -v descargar         # 1. ETL: REE y AEMET → data/raw → data/p
 python -m cpd warehouse            # 2. Carga del Data Warehouse DuckDB (segundos)
 python -m cpd entrenar consumo     # 3. Validación y entrenamiento de los modelos de demanda (~2-5 min)
 python -m cpd entrenar punta       #    Modelo de potencia punta y comparación con REE (~3-6 min)
+python -m cpd puntuar              # 5. Puntuación de viabilidad de cada municipio (segundos)
 python -m cpd entrenar precio      # 4. Validación y entrenamiento de los modelos de precio (~2-5 min)
 ```
 

@@ -100,5 +100,9 @@ Formato *Conventional Commits* en español: `tipo(ámbito): resumen en imperativ
 | 8 | `feature/etl-demanda-horaria` | Demanda horaria peninsular y potencia punta desde 2019 |
 | 9 | `feature/modelo-punta` | Modelo de potencia punta y comparación con REE |
 | 10 | `docs/demanda-horaria` | Documentación de la demanda horaria y de la punta |
+| 11 | `feature/etl-municipios` | Municipios del INE con población, superficie y coordenadas |
+| 12 | `feature/etl-clima-municipal` | Clima reciente de cada municipio con todas las estaciones de AEMET |
+| 13 | `feature/puntuacion` | Puntuación multicriterio de viabilidad y validación con CPD reales |
+| 14 | `docs/puntuacion` | Documentación de la puntuación |
 
 Desde el PR 7 se sigue la regla de **una rama y un PR por implementación** (datos, modelo y documentación por separado). Si una rama depende de otra, primero se fusiona la base y la siguiente se crea desde `desarrollo` actualizado; así se evitan las ramas apiladas.

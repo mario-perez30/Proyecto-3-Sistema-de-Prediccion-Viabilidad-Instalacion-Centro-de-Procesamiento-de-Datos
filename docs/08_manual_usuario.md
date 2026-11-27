@@ -16,6 +16,8 @@ Todas las operaciones se lanzan con `python -m cpd <comando>` (o `cpd <comando>`
 | `python -m cpd entrenar punta` | Igual para la potencia punta diaria y mensual; además compara la predicción a 1 día con la previsión oficial de REE | Después de cada descarga |
 | `python -m cpd descargar --sin-horaria` | Descarga sin la demanda cada 5 minutos (la más lenta la primera vez) | Actualizaciones rápidas |
 | `python -m cpd entrenar precio` | Lo mismo para el precio de la electricidad | Después de cada descarga |
+| `python -m cpd puntuar` | Puntuación de viabilidad de todos los municipios para un CPD (opciones: `--potencia-mw`, `--pue`, `--factor-carga`, `--poblacion-minima`, `--excluir-islas`, `--top`). Guarda `models/viabilidad/puntuacion_municipios.csv` | Para comparar ubicaciones |
+| `python -m cpd descargar --sin-municipios` | Descarga sin los municipios ni su clima | Actualizaciones rápidas |
 | `python -m cpd -v <comando>` | Muestra el detalle del proceso (cada consulta a la API, etc.) | Para seguir el progreso o diagnosticar |
 
 ### Ejemplo: descargar los datos
