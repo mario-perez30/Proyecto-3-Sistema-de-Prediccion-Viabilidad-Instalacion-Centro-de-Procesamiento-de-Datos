@@ -28,6 +28,16 @@ def _descargar(args: argparse.Namespace) -> int:
             f"[{estado}] {informe.tabla}: {informe.filas} filas ({informe.desde} → {informe.hasta}), huecos={informe.huecos}"
         )
     correcto = all(i.correcto for i in informes)
+    if not args.sin_municipios:
+        from cpd.etl import municipios
+
+        resumen = municipios.ejecutar()
+        estado = "OK" if resumen.correcto else "REVISAR"
+        print(
+            f"[{estado}] municipios: {resumen.municipios} (padrón {resumen.anio_padron}, "
+            f"{resumen.poblacion_total:,} hab.), sin coordenadas={resumen.sin_coordenadas}"
+        )
+        correcto = correcto and resumen.correcto
     if not args.sin_temperatura:
         correcto = _descargar_temperatura() and correcto
     return 0 if correcto else 1
@@ -112,6 +122,9 @@ def crear_parser() -> argparse.ArgumentParser:
         "--sin-horaria",
         action="store_true",
         help="omite la demanda horaria (cada 5 min, desde 2019)",
+    )
+    p.add_argument(
+        "--sin-municipios", action="store_true", help="omite los municipios (INE y Eurostat)"
     )
     p.add_argument("--sin-temperatura", action="store_true", help="omite la temperatura de AEMET")
     p.set_defaults(func=_descargar)

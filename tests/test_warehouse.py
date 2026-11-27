@@ -101,3 +101,42 @@ def test_construir_incluye_demanda_horaria_y_vista_de_punta(cliente_falso, tmp_p
     assert punta.loc[0, "hora_punta"] == 23
     assert punta.loc[0, "punta_mw"] == 30_000 + 2_300 + 55
     assert (punta["horas"] == 24).all()
+
+
+def test_construir_incluye_municipios_enlazados_a_su_comunidad(cliente_falso, tmp_path):
+    electricidad.demanda_diaria(cliente_falso, date(2024, 1, 1), date(2024, 1, 3)).to_parquet(
+        tmp_path / "demanda_diaria.parquet"
+    )
+    electricidad.precio_horario(cliente_falso, date(2024, 1, 1), date(2024, 1, 1)).to_parquet(
+        tmp_path / "precio_horario.parquet"
+    )
+    electricidad.demanda_ccaa_mensual(
+        cliente_falso, date(2024, 1, 1), date(2024, 1, 31), electricidad.COMUNIDADES[:1]
+    ).to_parquet(tmp_path / "demanda_ccaa_mensual.parquet")
+    pd.DataFrame(
+        {
+            "codigo_ine": ["41091"],
+            "nombre": ["Sevilla"],
+            "cpro": ["41"],
+            "provincia": ["Sevilla"],
+            "codigo_ccaa": ["AN"],
+            "ccaa": ["Andalucía"],
+            "poblacion": [680_000],
+            "poblacion_hace_10": [690_000.0],
+            "crecimiento_10a_pct": [-1.4],
+            "superficie_km2": [141.0],
+            "densidad_hab_km2": [4_822.0],
+            "lat": [37.38],
+            "lon": [-5.98],
+        }
+    ).to_parquet(tmp_path / "municipios.parquet")
+    ruta = tmp_path / "cpd.duckdb"
+
+    filas = warehouse.construir(tmp_path, ruta)
+
+    assert filas["dim_municipio"] == 1
+    fila = warehouse.consultar(
+        "SELECT m.nombre, t.codigo FROM dim_municipio m JOIN dim_territorio t ON m.ccaa_id = t.territorio_id",
+        ruta,
+    )
+    assert fila.loc[0, "codigo"] == "AN"
