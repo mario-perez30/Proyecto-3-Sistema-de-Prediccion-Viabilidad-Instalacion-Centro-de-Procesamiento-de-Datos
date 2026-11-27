@@ -1,4 +1,5 @@
 import json
+from dataclasses import replace
 
 import numpy as np
 import pandas as pd
@@ -80,8 +81,10 @@ def test_puntuar_excluye_ordena_y_explica():
     assert resultado.loc["B", "punto_debil"] == "clima"
     assert resultado.attrs["dimensiones_pendientes"] == {
         "conectividad": "Arnau Higueras",
+        "transporte": "sin datos",  # sin tabla de transporte, la dimensión queda pendiente
         "agua": "por asignar",
     }
+    assert "nota_transporte" not in resultado.columns
     assert sum(resultado.attrs["dimensiones_usadas"].values()) == pytest.approx(1)
     islas = v.puntuar(
         tabla, filtros=v.Filtros(poblacion_50km_minima=0, excluir_extrapeninsulares=True)
@@ -90,6 +93,46 @@ def test_puntuar_excluye_ordena_y_explica():
         islas.set_index("codigo_ine").loc["C", "motivo_exclusion"]
         == "sistema eléctrico extrapeninsular"
     )
+
+
+def _transporte():
+    return pd.DataFrame(
+        {
+            "codigo_ine": ["A", "B", "C", "D"],
+            "dist_salida_autovia_km": [1.0, 40.0, 5.0, 1.0],
+            "aeropuerto_iata": ["MAD", "MAD", "PMI", "MAD"],
+            "aeropuerto": ["Madrid", "Madrid", "Palma", "Madrid"],
+            "dist_aeropuerto_km": [15.0, 120.0, 10.0, 15.0],
+        }
+    )
+
+
+def test_puntuar_con_transporte_premia_la_accesibilidad():
+    demanda = pd.Series({"MD": 25e6, "AN": 40e6, "IB": 6e6})
+    tabla = v.variables(_municipios(), _clima(), demanda, v.ParametrosCPD(), _transporte())
+    resultado = v.puntuar(tabla, filtros=v.Filtros(poblacion_50km_minima=0)).set_index("codigo_ine")
+    assert "transporte" in resultado.attrs["dimensiones_usadas"]
+    assert "transporte" not in resultado.attrs["dimensiones_pendientes"]
+    assert resultado.loc["A", "nota_transporte"] > resultado.loc["B", "nota_transporte"]
+    assert resultado.loc["B", "nota_transporte"] == 0  # el peor candidato en las dos distancias
+
+
+def test_puntuar_dentro_de_una_zona_normaliza_solo_en_ella():
+    demanda = pd.Series({"MD": 25e6, "AN": 40e6, "IB": 6e6})
+    municipios = _municipios().assign(provincia=["Madrid", "Sevilla", "Balears, Illes", "Madrid"])
+    tabla = v.variables(municipios, _clima(), demanda, v.ParametrosCPD(), _transporte())
+    base = v.Filtros(poblacion_50km_minima=0, poblacion_municipio_minima=0)
+
+    madrid = v.puntuar(tabla, filtros=replace(base, comunidades=("MD",))).set_index("codigo_ine")
+    assert madrid.loc["B", "motivo_exclusion"] == "fuera de la zona elegida"
+    assert madrid.loc["C", "excluido"]
+    assert set(madrid.index[~madrid["excluido"]]) == {"A", "D"}
+    assert madrid["ranking"].min() == 1
+
+    sevilla = v.puntuar(tabla, filtros=replace(base, provincias=("Sevilla",)))
+    assert sevilla.iloc[0]["codigo_ine"] == "B" and sevilla.iloc[0]["ranking"] == 1
+    with pytest.raises(ValueError, match="zona elegida"):
+        v.puntuar(tabla, filtros=replace(base, provincias=("No existe",)))
 
 
 def test_puntuar_sin_candidatos_da_error_claro():
@@ -109,8 +152,10 @@ def test_validar_con_cpd_existentes():
             "lon": [-3.0] * 4,
         }
     )
-    existentes = pd.DataFrame({"lat": [40.01, 40.02], "lon": [-3.0, -3.0]})
+    # El tercero está a ~550 km de cualquier municipio (fuera de la zona): no cuenta.
+    existentes = pd.DataFrame({"lat": [40.01, 40.02, 48.0], "lon": [-3.0, -3.0, -3.0]})
     resultado = v.validar_con_cpd_existentes(puntuacion, existentes)
+    assert resultado["cpd"] == 2
     assert resultado["municipios_con_cpd"] == 1
     assert resultado["percentil_mediano"] == 100.0
     assert resultado["pct_en_el_25_superior"] == 100.0

@@ -77,17 +77,21 @@ CRITERIOS: tuple[Criterio, ...] = (
     Criterio("poblacion_50km", "talento", "mayor", 0.7, log=True, descripcion="Habitantes a menos de 50 km (personal técnico y servicios)"),
     Criterio("crecimiento_10a_pct", "talento", "mayor", 0.3, descripcion="Crecimiento de la población en 10 años (%)"),
     Criterio("densidad_desvio", "suelo", "menor", 1.0, descripcion="Distancia (en órdenes de magnitud) a una densidad periurbana de 1.000 hab/km²"),
+    Criterio("dist_salida_autovia_km", "transporte", "menor", 0.6, log=True, descripcion="Distancia a la salida de autovía más cercana (km)"),
+    Criterio("dist_aeropuerto_km", "transporte", "menor", 0.4, descripcion="Distancia al aeropuerto con vuelos regulares más cercano (km)"),
 )  # fmt: skip
 
 #: Peso de cada dimensión del enunciado en la puntuación global. Se ajustaron comprobando
 #: que los municipios con CPD reales (PeeringDB) salieran bien puntuados (ver ``docs/04``):
 #: la energía pesa poco porque apenas distingue entre municipios peninsulares y el talento
-#: (población a 50 km) pesa más porque mide la cercanía a un área metropolitana.
+#: (población a 50 km) pesa más porque mide la cercanía a un área metropolitana. Añadir el
+#: transporte subió el percentil mediano de los CPD reales de 77 a 81.
 PESOS_DIMENSION: dict[str, float] = {
-    "clima": 0.25,
-    "energia": 0.15,
+    "clima": 0.20,
+    "energia": 0.10,
     "conectividad": 0.20,
-    "talento": 0.30,
+    "talento": 0.25,
+    "transporte": 0.15,
     "suelo": 0.05,
     "agua": 0.05,
 }
@@ -105,6 +109,11 @@ class Filtros:
     #: Un CPD grande necesita suelo industrial, servicios municipales y accesos.
     poblacion_municipio_minima: float = 5_000
     excluir_extrapeninsulares: bool = False
+    #: Zona de búsqueda: códigos de comunidad (``MD``, ``CT``…) y nombres de provincia. Vacío =
+    #: toda España. La escala 0-100 se calcula solo entre los candidatos de la zona, así que la
+    #: puntuación responde a "¿cuál es el mejor municipio **dentro** de la zona elegida?".
+    comunidades: tuple[str, ...] = ()
+    provincias: tuple[str, ...] = ()
 
 
 # ---------------------------------------------------------------------------
@@ -121,6 +130,15 @@ def poblacion_en_radio(municipios: pd.DataFrame, radio_km: float = 50) -> np.nda
     return np.array([poblacion[v].sum() for v in vecinos])
 
 
+def cargar_transporte(ruta: Path | None = None) -> pd.DataFrame | None:
+    """Accesibilidad por transporte de cada municipio, o ``None`` si aún no se ha descargado."""
+    ruta = ruta or config.PROCESSED_DIR / "transporte_municipios.parquet"
+    if not ruta.exists():
+        log.warning("Sin %s: la dimensión de transporte queda pendiente", ruta.name)
+        return None
+    return pd.read_parquet(ruta)
+
+
 def demanda_anual_ccaa(ruta: Path | None = None) -> pd.Series:
     """Demanda eléctrica de los últimos 12 meses de cada comunidad (MWh)."""
     tabla = pd.read_parquet(ruta or config.PROCESSED_DIR / "demanda_ccaa_mensual.parquet")
@@ -133,9 +151,17 @@ def variables(
     clima: pd.DataFrame,
     demanda_ccaa_mwh: pd.Series,
     cpd: ParametrosCPD,
+    transporte: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
-    """Tabla de variables por municipio para un CPD concreto."""
+    """Tabla de variables por municipio para un CPD concreto.
+
+    Args:
+        transporte: distancias a la autovía y al aeropuerto (``cpd.etl.transporte``). Si no se
+            pasa, la dimensión de transporte queda como pendiente de datos.
+    """
     tabla = municipios.merge(clima, on="codigo_ine", how="left")
+    if transporte is not None:
+        tabla = tabla.merge(transporte, on="codigo_ine", how="left")
     tabla["poblacion_50km"] = poblacion_en_radio(tabla)
     tabla["demanda_ccaa_mwh"] = tabla["codigo_ccaa"].map(demanda_ccaa_mwh)
     tabla["peso_cpd_red_ccaa_pct"] = 100 * cpd.consumo_anual_mwh / tabla["demanda_ccaa_mwh"]
@@ -187,6 +213,9 @@ def puntuar(
     pesos = {**PESOS_DIMENSION, **(pesos or {})}
     filtros = filtros or Filtros()
     resultado = tabla.copy()
+    # Las dimensiones cuyas variables no están en la tabla (p. ej. sin datos de transporte) se
+    # tratan como pendientes, igual que la conectividad.
+    criterios = tuple(c for c in criterios if c.variable in resultado.columns)
 
     # 1. Exclusiones (antes de puntuar, para normalizar solo entre candidatos).
     motivo = pd.Series("", index=resultado.index)
@@ -199,11 +228,15 @@ def puntuar(
     if filtros.excluir_extrapeninsulares:
         motivo[resultado["sistema_peninsular"] == 0] = "sistema eléctrico extrapeninsular"
     motivo[resultado[[c.variable for c in criterios]].isna().any(axis=1)] = "datos incompletos"
+    if filtros.comunidades:
+        motivo[~resultado["codigo_ccaa"].isin(filtros.comunidades)] = "fuera de la zona elegida"
+    if filtros.provincias:
+        motivo[~resultado["provincia"].isin(filtros.provincias)] = "fuera de la zona elegida"
     resultado["excluido"] = motivo != ""
     resultado["motivo_exclusion"] = motivo
     candidatos = ~resultado["excluido"]
     if not candidatos.any():
-        raise ValueError("Ningún municipio pasa los filtros de exclusión")
+        raise ValueError("Ningún municipio pasa los filtros de exclusión (o la zona elegida)")
 
     # 2. Nota de cada dimensión y puntuación global.
     notas: dict[str, pd.Series] = {}
@@ -235,7 +268,7 @@ def puntuar(
         d: round(p / sum(activas.values()), 3) for d, p in activas.items()
     }
     resultado.attrs["dimensiones_pendientes"] = {
-        d: PENDIENTES.get(d, "") for d in pesos if d not in activas
+        d: PENDIENTES.get(d, "sin datos") for d in pesos if d not in activas
     }
     return resultado
 
@@ -265,21 +298,27 @@ def cpd_existentes(ruta: Path | None = None) -> pd.DataFrame:
     return tabla.dropna(subset=["lat", "lon"]).reset_index(drop=True)
 
 
-def validar_con_cpd_existentes(puntuacion: pd.DataFrame, existentes: pd.DataFrame) -> dict:
+def validar_con_cpd_existentes(
+    puntuacion: pd.DataFrame, existentes: pd.DataFrame, distancia_maxima_km: float = 25
+) -> dict:
     """¿Están bien puntuados los municipios donde el mercado ya ha instalado CPD?
 
     Cada CPD se asigna al municipio no excluido más cercano y se mira en qué percentil de
     puntuación cae ese municipio. Si la puntuación tiene sentido, los CPD reales deberían
-    concentrarse en percentiles altos.
+    concentrarse en percentiles altos. Los CPD a más de ``distancia_maxima_km`` de cualquier
+    candidato no cuentan (p. ej. los que quedan fuera de la zona elegida).
     """
     validos = puntuacion[~puntuacion["excluido"]].reset_index(drop=True)
     arbol = BallTree(np.radians(validos[["lat", "lon"]].to_numpy()), metric="haversine")
-    _, indice = arbol.query(np.radians(existentes[["lat", "lon"]].to_numpy()), k=1)
+    distancia, indice = arbol.query(np.radians(existentes[["lat", "lon"]].to_numpy()), k=1)
+    indice = indice[distancia[:, 0] * RADIO_TIERRA_KM <= distancia_maxima_km, 0]
+    if len(indice) == 0:
+        return {}
     percentil = validos["puntuacion"].rank(pct=True) * 100
-    de_cpd = percentil.iloc[indice[:, 0]]
+    de_cpd = percentil.iloc[indice]
     return {
-        "cpd": len(existentes),
-        "municipios_con_cpd": int(pd.Index(indice[:, 0]).nunique()),
+        "cpd": len(indice),
+        "municipios_con_cpd": int(pd.Index(indice).nunique()),
         "percentil_mediano": round(float(de_cpd.median()), 1),
         "pct_en_el_25_superior": round(float((de_cpd >= 75).mean() * 100), 1),
         "pct_en_el_10_superior": round(float((de_cpd >= 90).mean() * 100), 1),
@@ -308,7 +347,10 @@ def ejecutar(
     cpd = cpd or ParametrosCPD()
     municipios = pd.read_parquet(config.PROCESSED_DIR / "municipios.parquet")
     clima = pd.read_parquet(config.PROCESSED_DIR / "clima_municipios.parquet")
-    tabla = puntuar(variables(municipios, clima, demanda_anual_ccaa(), cpd), pesos, filtros)
+    transporte = cargar_transporte()
+    tabla = puntuar(
+        variables(municipios, clima, demanda_anual_ccaa(), cpd, transporte), pesos, filtros
+    )
     validacion = {}
     if validar:
         try:
@@ -321,9 +363,12 @@ def ejecutar(
         "ranking", "codigo_ine", "nombre", "provincia", "ccaa", "puntuacion",
         *[c for c in tabla.columns if c.startswith("nota_")], "punto_fuerte", "punto_debil",
         "excluido", "motivo_exclusion", "poblacion", "poblacion_50km", "estacion",
-        "grados_dia_refrigeracion", "dias_calor_35", "peso_cpd_red_ccaa_pct", "lat", "lon",
+        "grados_dia_refrigeracion", "dias_calor_35", "peso_cpd_red_ccaa_pct",
+        "dist_salida_autovia_km", "aeropuerto", "dist_aeropuerto_km", "lat", "lon",
     ]  # fmt: skip
-    tabla[columnas].to_csv(carpeta / "puntuacion_municipios.csv", index=False)
+    tabla[[c for c in columnas if c in tabla]].to_csv(
+        carpeta / "puntuacion_municipios.csv", index=False
+    )
     informe = {
         "cpd": asdict(cpd),
         "filtros": asdict(filtros or Filtros()),

@@ -25,14 +25,20 @@ import streamlit as st
 from cpd import config, simulador, viabilidad
 
 AZUL, NARANJA = "#1F4E79", "#E07B39"
-NOMBRES = {"clima": "Clima", "energia": "Energía", "talento": "Talento", "suelo": "Suelo"}
+NOMBRES = {
+    "clima": "Clima",
+    "energia": "Energía",
+    "talento": "Talento",
+    "transporte": "Transporte",
+    "suelo": "Suelo",
+}
 
 
 @st.cache_data(show_spinner="Cargando datos del Data Lake…")
-def cargar_base() -> tuple[pd.DataFrame, pd.DataFrame, pd.Series]:
+def cargar_base() -> tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.DataFrame | None]:
     municipios = pd.read_parquet(config.PROCESSED_DIR / "municipios.parquet")
     clima = pd.read_parquet(config.PROCESSED_DIR / "clima_municipios.parquet")
-    return municipios, clima, viabilidad.demanda_anual_ccaa()
+    return municipios, clima, viabilidad.demanda_anual_ccaa(), viabilidad.cargar_transporte()
 
 
 @st.cache_data(show_spinner="Calculando la puntuación…")
@@ -43,14 +49,19 @@ def calcular(
     poblacion_minima: float,
     sin_islas: bool,
     pesos: tuple,
+    comunidades: tuple = (),
+    provincias: tuple = (),
 ) -> pd.DataFrame:
-    municipios, clima, demanda = cargar_base()
+    municipios, clima, demanda, transporte = cargar_base()
     cpd = viabilidad.ParametrosCPD(potencia, pue, carga)
     filtros = viabilidad.Filtros(
-        poblacion_municipio_minima=poblacion_minima, excluir_extrapeninsulares=sin_islas
+        poblacion_municipio_minima=poblacion_minima,
+        excluir_extrapeninsulares=sin_islas,
+        comunidades=comunidades,
+        provincias=provincias,
     )
     tabla = viabilidad.puntuar(
-        viabilidad.variables(municipios, clima, demanda, cpd), dict(pesos), filtros
+        viabilidad.variables(municipios, clima, demanda, cpd, transporte), dict(pesos), filtros
     )
     return tabla
 
@@ -117,12 +128,26 @@ def barra_lateral() -> dict:
         "Habitantes mínimos del municipio", 0, 100_000, 5_000, step=1_000
     )
     sin_islas = st.sidebar.checkbox("Solo sistema peninsular")
+    municipios = cargar_base()[0]
+    nombres_ccaa = dict(municipios[["ccaa", "codigo_ccaa"]].drop_duplicates().to_numpy())
+    elegidas = st.sidebar.multiselect(
+        "Zona: comunidades",
+        sorted(nombres_ccaa),
+        help="Vacío = toda España. La puntuación compara solo los municipios de la zona",
+    )
+    en_zona = municipios[municipios["ccaa"].isin(elegidas)] if elegidas else municipios
+    provincias = st.sidebar.multiselect(
+        "Zona: provincias", sorted(en_zona["provincia"].dropna().unique())
+    )
     st.sidebar.header("Pesos")
     pesos = {
         d: st.sidebar.slider(NOMBRES[d], 0.0, 1.0, viabilidad.PESOS_DIMENSION[d], 0.05)
         for d in NOMBRES
     }
-    pendientes = ", ".join(f"{d} ({r})" for d, r in viabilidad.PENDIENTES.items())
+    sin_datos = dict(viabilidad.PENDIENTES)
+    if cargar_base()[3] is None:
+        sin_datos["transporte"] = "ejecuta python -m cpd descargar"
+    pendientes = ", ".join(f"{d} ({r})" for d, r in sin_datos.items())
     st.sidebar.caption(f"Pendientes de datos: {pendientes}. Sus pesos se reparten entre el resto.")
     return {
         "potencia": potencia,
@@ -131,8 +156,15 @@ def barra_lateral() -> dict:
         "cargos": cargos,
         "poblacion": poblacion,
         "sin_islas": sin_islas,
+        "comunidades": tuple(nombres_ccaa[c] for c in elegidas),
+        "provincias": tuple(provincias),
         "pesos": pesos,
     }
+
+
+def dimensiones(tabla: pd.DataFrame) -> list[str]:
+    """Dimensiones con nota en la tabla (sin datos de transporte, por ejemplo, no hay nota)."""
+    return [d for d in NOMBRES if f"nota_{d}" in tabla.columns]
 
 
 def pestana_ranking(tabla: pd.DataFrame) -> None:
@@ -148,21 +180,28 @@ def pestana_ranking(tabla: pd.DataFrame) -> None:
         f"Mejor municipio ({candidatos.iloc[0]['puntuacion']:.1f} puntos)",
         candidatos.iloc[0]["nombre"],
     )
-    if len(existentes):
-        validacion = viabilidad.validar_con_cpd_existentes(tabla, existentes)
+    validacion = viabilidad.validar_con_cpd_existentes(tabla, existentes) if len(existentes) else {}
+    if validacion:
         columnas[2].metric(
-            "CPD reales: percentil mediano",
+            f"{validacion['cpd']} CPD reales: percentil mediano",
             f"{validacion['percentil_mediano']:.0f}",
-            help="Municipios con CPD existentes (PeeringDB)",
+            help="Municipios con CPD existentes (PeeringDB) a menos de 25 km de un candidato",
         )
         columnas[3].metric(
             "CPD reales en el 25 % superior", f"{validacion['pct_en_el_25_superior']:.0f} %"
         )
 
+    # Con una zona elegida, el mapa se centra en ella.
+    zona = bool((tabla["motivo_exclusion"] == "fuera de la zona elegida").any())
+    centro = (
+        {"lat": candidatos["lat"].median(), "lon": candidatos["lon"].median()}
+        if zona
+        else {"lat": 40.2, "lon": -3.7}
+    )
     mapa = px.scatter_map(
         candidatos, lat="lat", lon="lon", color="puntuacion", color_continuous_scale="Viridis",
         hover_name="nombre", hover_data={"provincia": True, "ranking": True, "puntuacion": ":.1f", "lat": False, "lon": False},
-        zoom=4.6, center={"lat": 40.2, "lon": -3.7}, height=520, map_style="carto-positron",
+        zoom=6.5 if zona else 4.6, center=centro, height=520, map_style="carto-positron",
     )  # fmt: skip
     if len(existentes):
         mapa.add_trace(
@@ -181,7 +220,7 @@ def pestana_ranking(tabla: pd.DataFrame) -> None:
             "nombre",
             "provincia",
             "puntuacion",
-            *[f"nota_{d}" for d in NOMBRES],
+            *[f"nota_{d}" for d in dimensiones(tabla)],
             "punto_fuerte",
             "punto_debil",
         ]
@@ -190,7 +229,7 @@ def pestana_ranking(tabla: pd.DataFrame) -> None:
         f"nota_{d}": st.column_config.ProgressColumn(
             NOMBRES[d], min_value=0, max_value=100, format="%.0f"
         )
-        for d in NOMBRES
+        for d in dimensiones(tabla)
     }
     configuracion["puntuacion"] = st.column_config.NumberColumn("Puntuación", format="%.1f")
     st.dataframe(vista, hide_index=True, width="stretch", column_config=configuracion)
@@ -240,6 +279,18 @@ def pestana_simulador(tabla: pd.DataFrame, parametros: dict) -> None:
             "Grados-día de refrigeración",
             f"{resultado.clima.get('grados_dia_refrigeracion', float('nan')):.0f}",
         )
+    if pd.notna(fila.get("dist_salida_autovia_km")):
+        columnas = st.columns(4)
+        columnas[0].metric(
+            "Salida de autovía más cercana",
+            f"{fila['dist_salida_autovia_km']:.1f} km",
+            help="En línea recta desde el centro del municipio (OpenStreetMap)",
+        )
+        columnas[1].metric(
+            f"Aeropuerto más cercano ({fila['aeropuerto_iata']})",
+            f"{fila['dist_aeropuerto_km']:.0f} km",
+            help=f"{fila['aeropuerto']}, con vuelos regulares (OurAirports). En línea recta",
+        )
 
     notas = pd.DataFrame(
         {
@@ -264,7 +315,8 @@ def pestana_simulador(tabla: pd.DataFrame, parametros: dict) -> None:
     if otros:
         comparacion = tabla.loc[etiquetas[etiquetas.isin([elegido, *otros])].index]
         st.dataframe(
-            comparacion[["nombre", "provincia", "puntuacion", "ranking", *[f"nota_{d}" for d in NOMBRES], "dias_calor_35", "poblacion_50km"]],
+            comparacion[["nombre", "provincia", "puntuacion", "ranking", *[f"nota_{d}" for d in dimensiones(tabla)], "dias_calor_35", "poblacion_50km",
+                         *[c for c in ("dist_salida_autovia_km", "dist_aeropuerto_km") if c in tabla]]],
             hide_index=True, width="stretch",
         )  # fmt: skip
     st.caption(
@@ -367,6 +419,8 @@ def main() -> None:
         parametros["poblacion"],
         parametros["sin_islas"],
         tuple(parametros["pesos"].items()),
+        parametros["comunidades"],
+        parametros["provincias"],
     )
     ranking, simular, energia, modelos = st.tabs(
         ["🗺️ Ranking", "🧮 Simulador", "⚡ Energía", "✅ Calidad de los modelos"]
