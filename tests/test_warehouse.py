@@ -130,11 +130,21 @@ def test_construir_incluye_municipios_enlazados_a_su_comunidad(cliente_falso, tm
             "lon": [-5.98],
         }
     ).to_parquet(tmp_path / "municipios.parquet")
+    pd.DataFrame(
+        {
+            "codigo_ine": ["41091"],
+            "dist_salida_autovia_km": [1.2],
+            "aeropuerto_iata": ["SVQ"],
+            "aeropuerto": ["Sevilla"],
+            "dist_aeropuerto_km": [9.5],
+        }
+    ).to_parquet(tmp_path / "transporte_municipios.parquet")
     ruta = tmp_path / "cpd.duckdb"
 
     filas = warehouse.construir(tmp_path, ruta)
 
     assert filas["dim_municipio"] == 1
+    assert filas["fact_transporte_municipio"] == 1
     fila = warehouse.consultar(
         "SELECT m.nombre, t.codigo FROM dim_municipio m JOIN dim_territorio t ON m.ccaa_id = t.territorio_id",
         ruta,

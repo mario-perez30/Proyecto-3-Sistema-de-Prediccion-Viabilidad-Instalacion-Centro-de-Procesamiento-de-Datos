@@ -39,9 +39,33 @@ def _descargar(args: argparse.Namespace) -> int:
             f"{resumen.poblacion_total:,} hab.), sin coordenadas={resumen.sin_coordenadas}"
         )
         correcto = correcto and resumen.correcto
+    if not args.sin_transporte:
+        correcto = _descargar_transporte() and correcto
     if not args.sin_temperatura:
         correcto = _descargar_temperatura() and correcto
     return 0 if correcto else 1
+
+
+def _descargar_transporte() -> bool:
+    """Distancia de cada municipio a la salida de autovía y al aeropuerto más cercanos."""
+    from cpd import config
+    from cpd.etl import transporte
+
+    if not (config.PROCESSED_DIR / "municipios.parquet").exists():
+        print("[AVISO] Sin municipios.parquet: se omite el transporte")
+        return True
+    try:
+        resumen = transporte.ejecutar()
+    except transporte.OverpassError as error:
+        print(f"[REVISAR] transporte: OpenStreetMap no responde, vuelve a intentarlo ({error})")
+        return False
+    print(
+        f"[OK] transporte_municipios: {resumen.municipios} municipios; "
+        f"{resumen.salidas_autovia} salidas de autovía y {resumen.aeropuertos} aeropuertos; "
+        f"mediana a la salida {resumen.mediana_salida_km} km y al aeropuerto "
+        f"{resumen.mediana_aeropuerto_km} km"
+    )
+    return True
 
 
 def _descargar_temperatura() -> bool:
@@ -166,6 +190,11 @@ def crear_parser() -> argparse.ArgumentParser:
     )
     p.add_argument(
         "--sin-municipios", action="store_true", help="omite los municipios (INE y Eurostat)"
+    )
+    p.add_argument(
+        "--sin-transporte",
+        action="store_true",
+        help="omite la accesibilidad por transporte (OpenStreetMap y OurAirports)",
     )
     p.add_argument("--sin-temperatura", action="store_true", help="omite la temperatura de AEMET")
     p.set_defaults(func=_descargar)
