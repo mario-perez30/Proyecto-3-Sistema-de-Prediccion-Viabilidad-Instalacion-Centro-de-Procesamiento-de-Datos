@@ -147,6 +147,8 @@ def _puntuar(args: argparse.Namespace) -> int:
     filtros = viabilidad.Filtros(
         poblacion_municipio_minima=args.poblacion_minima,
         excluir_extrapeninsulares=args.excluir_islas,
+        comunidades=tuple(args.comunidad),
+        provincias=tuple(args.provincia),
     )
     resultado = viabilidad.ejecutar(cpd, filtros=filtros)
     tabla = resultado.tabla
@@ -208,6 +210,20 @@ def crear_parser() -> argparse.ArgumentParser:
     p.add_argument("--factor-carga", type=float, default=0.75, help="uso medio de la potencia")
     p.add_argument("--poblacion-minima", type=float, default=5000, help="habitantes mínimos")
     p.add_argument("--excluir-islas", action="store_true", help="solo sistema peninsular")
+    p.add_argument(
+        "--comunidad",
+        action="append",
+        default=[],
+        metavar="CODIGO",
+        help="busca solo en esta comunidad (MD, CT, AN…); se puede repetir",
+    )
+    p.add_argument(
+        "--provincia",
+        action="append",
+        default=[],
+        metavar="NOMBRE",
+        help="busca solo en esta provincia (nombre del INE); se puede repetir",
+    )
     p.add_argument("--top", type=int, default=20, help="municipios que se muestran")
     p.set_defaults(func=_puntuar)
 
